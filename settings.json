@@ -1,0 +1,8 @@
+{
+  "screenDescriberMode": "ocr",
+  "agent": "embacle",
+  "visionImageWidth": 500,
+  "ocrBackend": "auto",
+  "keystrokeDelayUs": 20000,
+  "clickHoldUs": 100000
+}
