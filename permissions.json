@@ -1,0 +1,5 @@
+{
+  "allow": ["tap", "swipe", "type_text", "press_key", "launch_app"],
+  "deny": [],
+  "blockedApps": ["Wallet", "Banking"]
+}
