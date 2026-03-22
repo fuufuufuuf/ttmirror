@@ -1,0 +1,11 @@
+{
+    "device_list":[
+    {"id": "288", "new_handle": "dsolores", "original_handle": "men1hu"},
+    {"id": "device_1", "new_handle": "288", "original_handle": "288"},
+    {"id": "device_2", "new_handle": "288", "original_handle": "288"},
+    {"id": "device_3", "new_handle": "288", "original_handle": "288"},
+    {"id": "device_4", "new_handle": "288", "original_handle": "288"}
+    ],
+    "feishu_info_url": "http://localhost:8000/run"
+
+}

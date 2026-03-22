@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /Users/haowang/ttmirror -type f \\\\\\(-name *.py -o -name *.js -o -name *.sh -o -name *.ts -o -name *.tsx \\\\\\))",
+      "mcp__mirroir__list_skills",
+      "mcp__mirroir__list_targets",
+      "mcp__mirroir__get_skill",
+      "mcp__mirroir__status",
+      "mcp__mirroir__screenshot",
+      "mcp__mirroir__launch_app",
+      "mcp__mirroir__tap",
+      "mcp__mirroir__describe_screen",
+      "mcp__mirroir__type_text",
+      "mcp__mirroir__press_key",
+      "Bash(python3:*)",
+      "Bash(osascript -e 'tell application \"\"System Events\"\" to tell process \"\"iPhone Mirroring\"\" to click window 1')",
+      "Bash(osascript:*)",
+      "Bash(cliclick c:196,569)",
+      "mcp__mirroir__swipe",
+      "Bash(screencapture --help)",
+      "Bash(chmod:*)",
+      "Bash(pip3 list:*)",
+      "Bash(claude -p --verbose)",
+      "Bash(claude -p --output-format stream-json)",
+      "Bash(claude -p --verbose --output-format stream-json)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "mirroir"
+  ],
+  "env_zzq": {
+    "ANTHROPIC_API_KEY": "sk-o13yBHdenK2OqFKs5j9onxgHlHqTNWSafLGdmkasS4ujYLcY",
+    "ANTHROPIC_BASE_URL": "http://104.233.217.86",
+    "ANTHROPIC_MODEL": "claude-haiku-4-5-20251001"
+  },
+  "env_larry": {
+    "ANTHROPIC_API_KEY": "sk-R08bUMmEdfJXgaHVszCiUjEKitQLn7tcFRpxMUB3jHzvS49d",
+    "ANTHROPIC_BASE_URL": "http://1.95.142.151:3000",
+    "ANTHROPIC_MODEL": "claude-opus-4-6"
+  }
+}
