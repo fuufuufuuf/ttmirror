@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "mirroir": {
-      "command": "/Users/haowang/mirroir"
+      "command": "/opt/homebrew/bin/mirroir"
     }
   }
 }
