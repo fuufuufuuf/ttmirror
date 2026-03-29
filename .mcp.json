@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "mirroir": {
-      "command": "/opt/homebrew/bin/mirroir"
+      "command": "/Users/tikaitongku/mirroir-mcp-0.30.0/.build/release/mirroir-mcp"
     }
   }
 }

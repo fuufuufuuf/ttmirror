@@ -109,7 +109,15 @@
       "Bash(copilot -p \"list all available models\" --model gpt-4.1-mini)",
       "Bash(copilot -p \"hi\" --model gpt-5-mini)",
       "Bash(copilot -p \"list\" --model gpt-4o-mini)",
-      "Bash(copilot -p \"Output ONLY the list of all available model names, one per line, no extra text\" --model gpt-4.1)"
+      "Bash(copilot -p \"Output ONLY the list of all available model names, one per line, no extra text\" --model gpt-4.1)",
+      "Bash(copilot -p \"hi\" --model \"gpt-5-mini\")",
+      "Bash(echo $COPILOT_HEADLESS_MODEL)",
+      "Bash(ls ~/Library/Logs/mirroir*)",
+      "Read(//private/tmp/**)",
+      "Bash(log show:*)",
+      "Bash(embacle-server --provider copilot --port 3000)",
+      "Bash(curl -s http://localhost:3000/health)",
+      "Bash(copilot -p \"say hello\" --model gpt-4.1)"
     ]
   },
   "enableAllProjectMcpServers": true,
