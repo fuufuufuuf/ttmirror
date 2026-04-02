@@ -12,7 +12,6 @@
 - `skills/safari/` — Safari 相关操作以及tiktok操作（下载视频、保存到相册）
 - `skills/tiktok/` — TikTok 相关操作（切换账号等）
 
-运行 `./setup.sh` 可将 skills 同步到 `~/.mirroir-mcp/skills/apps/`。
 支持 `${VAR}` 环境变量替换。
 
 **加载优先级**：项目本地 `.mirroir-mcp/skills/` > 全局 `~/.mirroir-mcp/skills/`

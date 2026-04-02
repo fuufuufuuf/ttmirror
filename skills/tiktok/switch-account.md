@@ -15,8 +15,10 @@ Switch to a specific TikTok account by username. The target account must already
 
 ## Rules
 
-- **Coordinates**: **MUST** use `describe_screen` to get tap coordinates — never estimate from screenshot pixels. `describe_screen` returns coordinates that can be used directly with `tap`. `screenshot` is only for visual verification, not for locating tap targets.
-- **Pacing**: Wait **2 seconds** (`sleep 2`) between consecutive mirroir tool calls to avoid rate limits. Only use `describe_screen` when you need to find a tap target.
+- **Coordinates**: **MUST** use `describe_screen` to get tap coordinates — never estimate from screenshot pixels. `screenshot` is only for visual verification, not for locating tap targets.
+- **Pacing**: Wait **2 seconds** (`sleep 2`) between consecutive mirroir tool calls to avoid rate limits.
+- **Fixed coordinates**:
+  - **Profile** tab: **(300, 680)**
 - **Keyboard shortcuts** (iPhone Mirroring):
   - **Cmd+1**: Home Screen
   - **Cmd+2**: App Switcher
@@ -39,29 +41,28 @@ Switch to a specific TikTok account by username. The target account must already
 
 ### Part 2: Go to Profile and check current account
 
-8. Use `describe_screen` to locate the **Profile** tab — look for an element labeled "Profile" in the bottom navigation bar. The `describe_screen` coordinates point to the text label, which is above the actual tappable icon. Add **55 points** to the Y coordinate returned by `describe_screen` before tapping (e.g. if `describe_screen` returns y=645, tap at y=700).
-9. Wait for the Profile page to load
+8. Tap **Profile** at fixed coordinates **(300, 680)**. Then use `describe_screen` to check the bottom tab bar — if the **Profile** icon is **black** (filled) and the bottom bar highlight color is **white**, the tap succeeded and you are on the Profile page. If not, retry the tap until the Profile page is confirmed.
+9. If the username is not visible (e.g. the page is scrolled down showing the video grid), tap the status bar at **(47, 57)** to scroll the page back to the top (iOS native behavior).
 10. Use `describe_screen` to read the current username displayed on the Profile page (shown as "Username v" with a dropdown arrow, and "@username" below it)
 11. **Compare** the displayed username (case-insensitive) with `${ACCOUNT_USERNAME}`:
-   - If they match, the correct account is already active. Take a screenshot as confirmation and **stop here** — no switch needed.
-   - If they do not match, continue to Part 3.
+    - If they match, the correct account is already active. Take a screenshot as confirmation and **stop here** — no switch needed.
+    - If they do not match, continue to Part 3.
 
 ### Part 3: Open account switcher
 
-12. Tap the username text (the one with the dropdown arrow "v") to open the "Switch account" bottom sheet
-13. Wait for the account switcher to appear
+12. Tap the username text (the one with the dropdown arrow "v") to open the "Switch account" bottom sheet.
 
 ### Part 4: Find and select the target account
 
-14. Use `describe_screen` to read all accounts listed in the switcher
-15. Look for `${ACCOUNT_USERNAME}` in the list (case-insensitive match)
-16. If the account is not visible, swipe up in the account list to reveal more accounts, then `describe_screen` again. Repeat until found or the list is exhausted
-17. If the account is not found at all, close the switcher (tap the **x** button) and report an error: "Account '${ACCOUNT_USERNAME}' not found in the account switcher"
-18. Tap the target account name to switch
+13. Use `describe_screen` to read all accounts listed in the switcher
+14. Look for `${ACCOUNT_USERNAME}` in the list (case-insensitive match)
+15. If the account is not visible, scroll down in the account list to reveal more accounts, then `describe_screen` again. Repeat until found or the list is exhausted
+16. If the account is not found at all, close the switcher (tap the **x** button) and report an error: "Account '${ACCOUNT_USERNAME}' not found in the account switcher"
+17. Tap the target account name to switch
 
 ### Part 5: Verify the switch
 
-19. Wait 3 seconds for the account switch to complete
-20. Use `describe_screen` on the Profile page
-21. Confirm the displayed username matches `${ACCOUNT_USERNAME}`. If it matches, the switch is successful. If not, report the mismatch.
-22. Take a screenshot as confirmation: "tiktok_account_switched"
+18. Wait 3 seconds for the account switch to complete
+19. Use `describe_screen` on the Profile page
+20. Confirm the displayed username matches `${ACCOUNT_USERNAME}`. If it matches, the switch is successful. If not, report the mismatch.
+21. Take a screenshot as confirmation: "tiktok_account_switched"

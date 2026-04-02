@@ -45,8 +45,12 @@ def extract_links(field):
     links = []
     if isinstance(field, list):
         for item in field:
-            if isinstance(item, dict) and item.get("type") == "url" and item.get("link"):
+            if not isinstance(item, dict):
+                continue
+            if item.get("type") == "url" and item.get("link"):
                 links.append(item["link"])
+            elif item.get("type") == "text" and item.get("text", "").startswith("http"):
+                links.append(item["text"])
     return links
 
 
@@ -143,7 +147,7 @@ def ensure_account(post_account: str):
         f"--- SKILL ---\n{skill_content}\n--- END SKILL ---"
     )
     proc = subprocess.Popen(
-        ["claude", "-p", "--model", "claude-sonnet-4-6",
+        ["claude", "-p", "--model", "claude-haiku-4-5-20251001",
          "--verbose", "--output-format", "stream-json",
          "--allowedTools", "mcp__mirroir__*", "Bash"],
         stdin=subprocess.PIPE,
@@ -204,7 +208,7 @@ def upload_video(video_url: str, title: str) -> bool:
         f"--- SKILL ---\n{skill_content}\n--- END SKILL ---"
     )
     proc = subprocess.Popen(
-        ["claude", "-p", "--model", "claude-sonnet-4-6",
+        ["claude", "-p", "--model", "claude-haiku-4-5-20251001",
          "--verbose", "--output-format", "stream-json",
          "--allowedTools", "mcp__mirroir__*", "Bash"],
         stdin=subprocess.PIPE,
