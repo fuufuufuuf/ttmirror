@@ -13,6 +13,7 @@ Download a video from a URL in Chrome and share it directly to TikTok for postin
 
 - **Coordinates**: **MUST** use `describe_screen` to get tap coordinates — never estimate from screenshot pixels. `describe_screen` returns coordinates that can be used directly with `tap`. `screenshot` is only for visual verification, not for locating tap targets.
 - **Pacing**: Wait **2 seconds** (`sleep 2`) between consecutive mirroir tool calls to avoid rate limits. Only use `describe_screen` when you need to find a tap target.
+- **Failure recovery**: If any step fails or the UI is not in the expected state, **do NOT try alternative approaches, workarounds, or ad-hoc recovery**. Immediately kill **both Chrome and TikTok** (force-quit via App Switcher) and restart the entire skill from **Step 1**.
 
 - **Fixed coordinates**:
   - **Profile** tab: **(300, 680)**
@@ -52,12 +53,10 @@ Download a video from a URL in Chrome and share it directly to TikTok for postin
 17. Wait for the sound picker to appear
 18. Tap "Original" to mute the original video audio
 19. Tap "For you" tab to browse recommended music
-20. Swipe up to scroll down the music list
-21. Tap a random music track to select it
-22. Tap the upper-center area of the screen to return to the video editor
-23. **DO NOT use `describe_screen`**. Tap **Next** directly at fixed coordinates **(248, 680)**. The OCR returns incorrect Y for this button.
-24. Wait for the post editing screen (caption, hashtags)
-25. Tap the "Add description..." text field, then use `type_text` to enter the video title. Copy the title to macOS clipboard first: run `echo -n "${VIDEO_TITLE:-}" | pbcopy`, then paste with **Cmd+V**.
-26. **DO NOT use `describe_screen`**. Tap **Post** directly at fixed coordinates **(248, 680)**. The OCR returns incorrect Y for this button.
-27. Wait for upload to complete
-28. Screenshot: "tiktok_posted"
+20. Tap the upper-center area of the screen to return to the video editor
+21. **DO NOT use `describe_screen`**. Tap **Next** directly at fixed coordinates **(248, 680)**. The OCR returns incorrect Y for this button.
+22. Wait for the post editing screen (caption, hashtags)
+23. Tap the "Add description..." text field, then use `type_text` to enter the video title. Copy the title to macOS clipboard first: run `echo -n "${VIDEO_TITLE:-}" | pbcopy`, then paste with **Cmd+V**.
+24. **DO NOT use `describe_screen`**. Tap **Post** directly at fixed coordinates **(248, 680)**. The OCR returns incorrect Y for this button.
+25. Wait for upload to complete
+26. Screenshot: "tiktok_posted"

@@ -147,7 +147,7 @@ def ensure_account(post_account: str):
         f"--- SKILL ---\n{skill_content}\n--- END SKILL ---"
     )
     proc = subprocess.Popen(
-        ["claude", "-p", "--model", "claude-haiku-4-5-20251001",
+        ["claude", "-p", "--model", "claude-sonnet-4-6",
          "--verbose", "--output-format", "stream-json",
          "--allowedTools", "mcp__mirroir__*", "Bash"],
         stdin=subprocess.PIPE,
@@ -208,7 +208,7 @@ def upload_video(video_url: str, title: str) -> bool:
         f"--- SKILL ---\n{skill_content}\n--- END SKILL ---"
     )
     proc = subprocess.Popen(
-        ["claude", "-p", "--model", "claude-haiku-4-5-20251001",
+        ["claude", "-p", "--model", "claude-sonnet-4-6",
          "--verbose", "--output-format", "stream-json",
          "--allowedTools", "mcp__mirroir__*", "Bash"],
         stdin=subprocess.PIPE,

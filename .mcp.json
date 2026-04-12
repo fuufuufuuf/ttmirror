@@ -2,7 +2,7 @@
 {
   "mcpServers": {
     "mirroir": {
-      "command": "/Users/tikaitongku/mirroir-mcp-0.31.1/.build/release/mirroir-mcp"
+      "command": "/Users/tikaitongku/mirroir-mcp-0.32.1/.build/release/mirroir-mcp"
     }
   }
 }

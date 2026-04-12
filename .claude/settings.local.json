@@ -20,7 +20,21 @@
       "Bash(python3 auto_upload.py)",
       "mcp__mirroir__swipe",
       "Bash(./dismiss_camera_dialog.sh)",
-      "Bash(osascript -e 'tell application \"iPhone Mirroring\" to activate')"
+      "Bash(osascript -e 'tell application \"iPhone Mirroring\" to activate')",
+      "Bash(gh api:*)",
+      "Bash(/Users/tikaitongku/mirroir-mcp-0.32.1/.build/release/mirroir-mcp --help)",
+      "Bash(pip3 list:*)",
+      "Bash(xcrun coremlcompiler:*)",
+      "Bash(/usr/bin/python3 --version)",
+      "Bash(/usr/bin/python3 -c ':*)",
+      "mcp__mirroir__press_app_switcher",
+      "mcp__mirroir__long_press",
+      "mcp__mirroir__reset_app",
+      "mcp__mirroir__press_home",
+      "mcp__mirroir__launch_app",
+      "Bash(open -a \"iPhone Mirroring\")",
+      "Bash(osascript -e 'tell application \"System Events\" to tell process \"iPhone Mirroring\" to set frontmost to true')",
+      "Bash(osascript -e 'tell application \"System Events\" to tell process \"iPhone Mirroring\" to get every window')"
     ]
   },
   "enableAllProjectMcpServers": true,
