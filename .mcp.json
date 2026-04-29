@@ -2,7 +2,11 @@
 {
   "mcpServers": {
     "mirroir": {
-      "command": "/Users/tikaitongku/mirroir-mcp-0.31.1/.build/release/mirroir-mcp"
+      "command": "/Users/haowang/mirroir-mcp-0.33.1/.build/release/mirroir-mcp"
+    },
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["-y", "chrome-devtools-mcp@latest"]
     }
   }
 }

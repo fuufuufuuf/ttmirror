@@ -50,7 +50,7 @@ Switch to a specific TikTok account by username. The target account must already
 
 ### Part 3: Open account switcher
 
-12. Tap the username text (the one with the dropdown arrow "v") to open the "Switch account" bottom sheet.
+12. Tap fixed coordinates **(167, 196)** to open the "Switch account" bottom sheet.
 
 ### Part 4: Find and select the target account
 
@@ -65,4 +65,3 @@ Switch to a specific TikTok account by username. The target account must already
 18. Wait 3 seconds for the account switch to complete
 19. Use `describe_screen` on the Profile page
 20. Confirm the displayed username matches `${ACCOUNT_USERNAME}`. If it matches, the switch is successful. If not, report the mismatch.
-21. Take a screenshot as confirmation: "tiktok_account_switched"

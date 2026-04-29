@@ -39,10 +39,14 @@ Download a video from a URL in Chrome and share it directly to TikTok for postin
 
 ### Part 2: Share video to TikTok
 
-10. Tap "DOWNLOAD". Wait for the "Download complete" banner to appear at the bottom of the screen
+10. After pressing Return on the URL, a download bar appears at the bottom of the page showing the file name (e.g. `1731837266182378409.mp4`), file size, source URL, and a blue **DOWNLOAD** button on the right.
+    - **Verify**: extract the numeric ID from `${VIDEO_URL}` (the digit segment before `.mp4`) and confirm it matches the file name shown in the bottom bar. If they do not match, the wrong page loaded — reload and retry.
+    - **You MUST tap the "DOWNLOAD" button.** The download does NOT start automatically just from loading the page; only tapping DOWNLOAD triggers it.
+    - Use `describe_screen` to locate the DOWNLOAD element.
+    - After tapping, wait for the "Download complete" banner to appear at the bottom of the screen. If it does not appear within 5 seconds, reload the page and retry.
 11. Tap "OPEN IN..." on the download complete banner to open the share sheet
 12. Wait for the share sheet to appear
-13. Use `describe_screen` to check if "TikTok" is in the app icon row. If not visible, swipe right (from_x=200, to_x=50, duration 1000ms) on the app row to reveal more apps, then `describe_screen` again. Repeat until "TikTok" appears, then tap it.
+13. Use `describe_screen` to find the app icon row (the row containing AirDrop / Mail / etc.) and check if "TikTok" is present. If not visible, swipe **right** on that row to reveal more apps: take the Y coordinate of any visible app icon in that row from `describe_screen`, then call `swipe(from_x=50, to_x=200, from_y=<that Y>, to_y=<that Y>, duration_ms=500)`. After the swipe, `describe_screen` again. Repeat until "TikTok" appears, then tap it.
 14. Wait for TikTok to open. A "Share on TikTok" modal appears with **Video** and **Message** buttons. Use `describe_screen` to locate the "Video" button, then tap it to enter the video editing flow.
 15. If "iPhone camera is not available from Mac" dialog appears, dismiss it by running `dismiss_camera_dialog.sh` or using cliclick to click OK at the dialog's screen position
 
@@ -54,7 +58,7 @@ Download a video from a URL in Chrome and share it directly to TikTok for postin
 19. Tap "For you" tab to browse recommended music
 20. Swipe up to scroll down the music list
 21. Tap a random music track to select it
-22. Tap the upper-center area of the screen to return to the video editor
+22. Tap fixed coordinates **(150, 200)** to return to the video editor
 23. **DO NOT use `describe_screen`**. Tap **Next** directly at fixed coordinates **(248, 680)**. The OCR returns incorrect Y for this button.
 24. Wait for the post editing screen (caption, hashtags)
 25. Tap the "Add description..." text field, then use `type_text` to enter the video title. Copy the title to macOS clipboard first: run `echo -n "${VIDEO_TITLE:-}" | pbcopy`, then paste with **Cmd+V**.
