@@ -16,7 +16,6 @@ Switch to a specific TikTok account by username. The target account must already
 ## Rules
 
 - **Coordinates**: **MUST** use `describe_screen` to get tap coordinates — never estimate from screenshot pixels. `screenshot` is only for visual verification, not for locating tap targets.
-- **Pacing**: Wait **2 seconds** (`sleep 2`) between consecutive mirroir tool calls to avoid rate limits.
 - **Failure recovery**: If any step fails or the UI is not in the expected state, **do NOT try alternative approaches, workarounds, or ad-hoc recovery**. Immediately kill TikTok (force-quit via App Switcher or `killall` equivalent) and restart the entire skill from **Step 1**.
 - **Fixed coordinates**:
   - **Profile** tab: **(300, 680)**

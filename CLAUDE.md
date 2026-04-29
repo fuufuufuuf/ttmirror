@@ -36,8 +36,9 @@ Every `tap` operation MUST strictly follow this procedure:
 ## Skills
 
 Project-specific mirroir skills live under `skills/`:
-- `skills/safari/` — Safari operations and TikTok operations (download videos, save to Photos)
-- `skills/tiktok/` — TikTok operations (account switching, etc.)
+- `skills/tiktok/` — TikTok operations (download videos, account switching, etc.)
+- `skills/chrome/` — TikTok Shop dashboard operations via chrome-devtools MCP
+- `skills/ios/` — generic iOS operations (e.g. force-quit an app)
 
 `${VAR}` environment variable substitution is supported.
 

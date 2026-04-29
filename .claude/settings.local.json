@@ -4,51 +4,35 @@
       "mcp__mirroir__status",
       "mcp__mirroir__get_skill",
       "mcp__mirroir__check_health",
-      "Read(//Users/tikaitongku/.mirroir-mcp/**)",
       "mcp__mirroir__press_key",
       "mcp__mirroir__spotlight",
       "mcp__mirroir__screenshot",
       "mcp__mirroir__describe_screen",
       "mcp__mirroir__tap",
-      "WebFetch(domain:github.com)",
-      "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(curl -sL https://raw.githubusercontent.com/jfarcand/mirroir-mcp/main/docs/configuration.md)",
-      "Bash(curl -sL https://raw.githubusercontent.com/jfarcand/mirroir-mcp/main/Sources/HelperLib/TimingConstants.swift)",
-      "Bash(curl -sL https://raw.githubusercontent.com/jfarcand/mirroir-mcp/main/docs/yolo-models.md)",
-      "Bash(curl -s \"https://lauren-moodier-adjunctly.ngrok-free.dev/run/pending-upload?handle=men1hu\")",
-      "Bash(python3 -c ':*)",
-      "Bash(python3 auto_upload.py)",
-      "mcp__mirroir__swipe",
-      "Bash(./dismiss_camera_dialog.sh)",
-      "Bash(osascript -e 'tell application \"iPhone Mirroring\" to activate')",
-      "Bash(gh api:*)",
-      "Bash(/Users/tikaitongku/mirroir-mcp-0.32.1/.build/release/mirroir-mcp --help)",
-      "Bash(pip3 list:*)",
-      "Bash(xcrun coremlcompiler:*)",
-      "Bash(/usr/bin/python3 --version)",
-      "Bash(/usr/bin/python3 -c ':*)",
       "mcp__mirroir__press_app_switcher",
       "mcp__mirroir__long_press",
       "mcp__mirroir__reset_app",
       "mcp__mirroir__press_home",
       "mcp__mirroir__launch_app",
+      "mcp__mirroir__open_url",
+      "mcp__mirroir__type_text",
+      "mcp__mirroir__swipe",
+      "Read(//Users/tikaitongku/.mirroir-mcp/**)",
+      "Bash(./dismiss_camera_dialog.sh)",
+      "Bash(osascript -e 'tell application \"iPhone Mirroring\" to activate')",
+      "Bash(/Users/tikaitongku/mirroir-mcp-0.32.1/.build/release/mirroir-mcp --help)",
       "Bash(open -a \"iPhone Mirroring\")",
       "Bash(osascript -e 'tell application \"System Events\" to tell process \"iPhone Mirroring\" to set frontmost to true')",
-      "Bash(osascript -e 'tell application \"System Events\" to tell process \"iPhone Mirroring\" to get every window')"
+      "Bash(osascript -e 'tell application \"System Events\" to tell process \"iPhone Mirroring\" to get every window')",
+      "mcp__mirroir__drag",
+      "mcp__chrome-devtools__list_pages",
+      "mcp__chrome-devtools__select_page",
+      "mcp__chrome-devtools__take_snapshot",
+      "mcp__chrome-devtools__click"
     ]
   },
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "mirroir"
-  ],
-  "env_zzq": {
-    "ANTHROPIC_API_KEY": "sk-o13yBHdenK2OqFKs5j9onxgHlHqTNWSafLGdmkasS4ujYLcY",
-    "ANTHROPIC_BASE_URL": "http://104.233.217.86",
-    "ANTHROPIC_MODEL": "claude-haiku-4-5-20251001"
-  },
-  "env_larry": {
-    "ANTHROPIC_API_KEY": "sk-R08bUMmEdfJXgaHVszCiUjEKitQLn7tcFRpxMUB3jHzvS49d",
-    "ANTHROPIC_BASE_URL": "http://1.95.142.151:3000",
-    "ANTHROPIC_MODEL": "claude-opus-4-6"
-  }
+  ]
 }
