@@ -1,0 +1,1 @@
+ANTHROPIC_MODEL=haiku /Users/tikaitongku/dravr-embacle/target/release/embacle-server --provider claude --port 3000

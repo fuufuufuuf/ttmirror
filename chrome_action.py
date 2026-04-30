@@ -1,0 +1,194 @@
+"""Per-account Chrome control: clones the matching system Chrome profile to
+``chrome_profile/<account>/Default/`` on first use, runs a dedicated debug Chrome on
+``CHROME_DEBUG_PORT``, and dispatches the chrome-devtools MCP skill via ``claude -p``."""
+
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+import urllib.request
+
+MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
+SKILLS_DIR = os.path.join(MODULE_DIR, "skills")
+CHROME_ADD_PRODUCT_SKILL_PATH = os.path.join(SKILLS_DIR, "chrome", "tiktok-shop-add-product.md")
+
+CHROME_DEBUG_PORT = 9222
+CHROME_BIN = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+CHROME_DEFAULT_USER_DIR = os.path.expanduser("~/Library/Application Support/Google/Chrome")
+PROJECT_CHROME_PROFILE_DIR = os.path.join(MODULE_DIR, "chrome_profile")
+
+
+def _chrome_debug_alive() -> bool:
+    try:
+        with urllib.request.urlopen(f"http://localhost:{CHROME_DEBUG_PORT}/json/version", timeout=2) as resp:
+            return resp.status == 200
+    except Exception:
+        return False
+
+
+def _normalize(s: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", (s or "").lower())
+
+
+def _find_system_chrome_profile_subdir(account: str) -> str:
+    """Return the 'Profile X' / 'Default' subfolder under the system Chrome user-data-dir whose
+    display name matches the given account (loose match: lowercased, alnum only). '' if none."""
+    ls_path = os.path.join(CHROME_DEFAULT_USER_DIR, "Local State")
+    if not os.path.isfile(ls_path):
+        return ""
+    try:
+        with open(ls_path) as f:
+            ls = json.load(f)
+    except Exception:
+        return ""
+    target = _normalize(account)
+    for subdir, info in ls.get("profile", {}).get("info_cache", {}).items():
+        if _normalize(info.get("name", "")) == target:
+            return subdir
+    return ""
+
+
+def _account_user_data_dir(account: str) -> str:
+    return os.path.join(PROJECT_CHROME_PROFILE_DIR, account.strip().lower())
+
+
+def ensure_chrome_profile_for_account(account: str) -> str:
+    """Ensure chrome_profile/<account>/Default/ exists, cloning from the matching system Chrome
+    profile on first use. Returns the user-data-dir path, or '' if no profile is available."""
+    user_data = _account_user_data_dir(account)
+    profile_dst = os.path.join(user_data, "Default")
+    if os.path.isdir(profile_dst):
+        return user_data
+    src_subdir = _find_system_chrome_profile_subdir(account)
+    if not src_subdir:
+        return ""
+    src = os.path.join(CHROME_DEFAULT_USER_DIR, src_subdir)
+    if not os.path.isdir(src):
+        return ""
+    os.makedirs(profile_dst, exist_ok=True)
+    subprocess.run(["rsync", "-a", src + "/", profile_dst + "/"], check=True)
+    print(f"  Cloned Chrome profile for '{account}' from {src} -> {profile_dst}")
+    return user_data
+
+
+_current_chrome_account = None
+
+
+def ensure_debug_chrome(account: str, user_data_dir: str):
+    """Make sure a debug Chrome is running on CHROME_DEBUG_PORT with the given account's profile.
+    Restarts Chrome if a different account's profile is currently loaded."""
+    global _current_chrome_account
+    target = account.strip().lower()
+    if _chrome_debug_alive() and _current_chrome_account == target:
+        return
+    if _chrome_debug_alive():
+        subprocess.run(["pkill", "-f", f"--user-data-dir={PROJECT_CHROME_PROFILE_DIR}"], check=False)
+        for _ in range(10):
+            time.sleep(0.5)
+            if not _chrome_debug_alive():
+                break
+    log_path = "/tmp/chrome_debug.log"
+    subprocess.Popen(
+        [CHROME_BIN,
+         f"--user-data-dir={user_data_dir}",
+         "--profile-directory=Default",
+         f"--remote-debugging-port={CHROME_DEBUG_PORT}"],
+        stdout=open(log_path, "ab"),
+        stderr=subprocess.STDOUT,
+        start_new_session=True,
+    )
+    for _ in range(30):
+        time.sleep(0.5)
+        if _chrome_debug_alive():
+            _current_chrome_account = target
+            return
+    raise RuntimeError(f"Debug Chrome for '{account}' did not become reachable on port {CHROME_DEBUG_PORT} (see {log_path})")
+
+
+NON_AFFILIATE_NOTE = "此商品不是联盟营销商品。请联系卖家，以将其注册到联盟计划中"
+
+
+def ensure_chrome_action(post_account: str, product_id: str) -> str:
+    """After switching the TikTok account, run the Chrome shop dashboard skill if a project profile
+    exists (or can be auto-cloned) for that account. Otherwise skip silently.
+
+    Returns:
+        ""              — success, OK to proceed with upload.
+        NON_AFFILIATE_NOTE — product rejected by TikTok (not in affiliate program); caller should skip upload and mark Feishu.
+        any other non-empty string — opaque failure note (chrome action exited non-zero or other unexpected state)."""
+    if not post_account:
+        return ""
+    user_data = ensure_chrome_profile_for_account(post_account)
+    if not user_data:
+        print(f"  No Chrome profile for '{post_account}' under {PROJECT_CHROME_PROFILE_DIR}; skipping chrome action.")
+        return ""
+    print(f"  Chrome action for account {post_account} (product_id={product_id})")
+    ensure_debug_chrome(post_account, user_data)
+    with open(CHROME_ADD_PRODUCT_SKILL_PATH, "r") as f:
+        skill_content = f.read()
+    prompt = (
+        f"Run the chrome-devtools skill below.\n"
+        f"PRODUCT_ID: {product_id}\n"
+        f"POST_ACCOUNT: {post_account}\n\n"
+        f"Execute the steps using the mcp__chrome-devtools__* tools. "
+        f"Replace ${{PRODUCT_ID}} and ${{POST_ACCOUNT}} with the values above.\n\n"
+        f"--- SKILL ---\n{skill_content}\n--- END SKILL ---"
+    )
+    proc = subprocess.Popen(
+        ["claude", "-p", "--model", "claude-sonnet-4-6",
+         "--verbose", "--output-format", "stream-json",
+         "--allowedTools", "mcp__chrome-devtools__*", "Bash"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=sys.stderr,
+        cwd=MODULE_DIR,
+        text=True,
+        bufsize=1,
+    )
+    proc.stdin.write(prompt)
+    proc.stdin.close()
+
+    note = ""
+    for line in proc.stdout:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        etype = event.get("type")
+        if etype == "assistant":
+            for block in event.get("message", {}).get("content", []):
+                if block.get("type") == "text" and block.get("text"):
+                    text = block["text"]
+                    print(f"  {text}", flush=True)
+                    if not note and ("NON_AFFILIATE_PRODUCT:" in text):
+                        note = NON_AFFILIATE_NOTE
+                elif block.get("type") == "tool_use":
+                    name = block.get("name", "")
+                    inp = json.dumps(block.get("input", {}), ensure_ascii=False)
+                    print(f"  -> {name}({inp})", flush=True)
+        elif etype == "tool_result":
+            content = event.get("content", "")
+            if isinstance(content, list):
+                for c in content:
+                    if c.get("type") == "text":
+                        text = c.get("text", "")
+                        print(f"     = {text[:200]}", flush=True)
+                        if not note and ("NON_AFFILIATE_PRODUCT:" in text):
+                            note = NON_AFFILIATE_NOTE
+        elif etype == "result":
+            text = str(event.get("result", ""))
+            print(f"  Result: {text[:300]}", flush=True)
+            if not note and ("NON_AFFILIATE_PRODUCT:" in text):
+                note = NON_AFFILIATE_NOTE
+
+    proc.wait()
+    if proc.returncode != 0:
+        print(f"  Warning: chrome action exited {proc.returncode}", file=sys.stderr)
+        if not note:
+            note = f"chrome action exit {proc.returncode}"
+    return note

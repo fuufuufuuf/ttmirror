@@ -16,7 +16,7 @@ Switch to a specific TikTok account by username. The target account must already
 ## Rules
 
 - **Coordinates**: **MUST** use `describe_screen` to get tap coordinates — never estimate from screenshot pixels. `screenshot` is only for visual verification, not for locating tap targets.
-- **Pacing**: Wait **2 seconds** (`sleep 2`) between consecutive mirroir tool calls to avoid rate limits.
+- **Failure recovery**: If any step fails or the UI is not in the expected state, **do NOT try alternative approaches, workarounds, or ad-hoc recovery**. Immediately kill TikTok (force-quit via App Switcher or `killall` equivalent) and restart the entire skill from **Step 1**.
 - **Fixed coordinates**:
   - **Profile** tab: **(300, 680)**
 - **Keyboard shortcuts** (iPhone Mirroring):
@@ -43,7 +43,7 @@ Switch to a specific TikTok account by username. The target account must already
 
 8. Tap **Profile** at fixed coordinates **(300, 680)**. Then use `describe_screen` to check the bottom tab bar — if the **Profile** icon is **black** (filled) and the bottom bar highlight color is **white**, the tap succeeded and you are on the Profile page. If not, retry the tap until the Profile page is confirmed.
 9. If the username is not visible (e.g. the page is scrolled down showing the video grid), tap the status bar at **(47, 57)** to scroll the page back to the top (iOS native behavior).
-10. Use `describe_screen` to read the current username displayed on the Profile page (shown as "Username v" with a dropdown arrow, and "@username" below it)
+10. Use `describe_screen` to read the current username displayed on the Profile page (shown as "@username")
 11. **Compare** the displayed username (case-insensitive) with `${ACCOUNT_USERNAME}`:
     - If they match, the correct account is already active. Take a screenshot as confirmation and **stop here** — no switch needed.
     - If they do not match, continue to Part 3.

@@ -1,20 +1,48 @@
-# TikTok Mirror 自动化项目
+# TikTok Mirror Automation Project
 
-## 坐标系统（核心）
+## Coordinate System (Core)
 
-- **禁止从截图估算坐标**：不要通过 `screenshot` 的图片像素位置来推算 tap 坐标，错误率极高
-- **MUST 使用 `describe_screen`** 获取 tap 坐标，其返回的坐标可以直接用于 `tap`
-- `screenshot` 仅用于：唤醒 mirroring、确认操作结果、视觉验证。**绝不用于定位点击目标**
+Every `tap` operation MUST strictly follow this procedure:
+
+### Step 1: Get candidate coordinates
+- Call `describe_screen` to retrieve the element list
+- Find the target element in the list; record its coordinates as the candidate `(x1, y1)`
+- If the target is not in the list (not even as an anonymous "icon"), skip to Step 4
+
+### Step 2: Cross-validate with a screenshot
+- Call `screenshot` to capture the current screen
+- Check whether `(x1, y1)` falls inside the visual bounds of the target element in the screenshot
+- **Match** → execute `tap(x1, y1)`, then go to Step 5
+- **Mismatch** → go to Step 3
+
+### Step 3: Use visual coordinates from the screenshot
+- Estimate coordinates `(x2, y2)` from the target's visual position in the screenshot
+- Execute `tap(x2, y2)`, then go to Step 5
+
+### Step 4: Fallback when the element is completely unrecognized
+- `describe_screen` did not return the target element (not even as an anonymous icon)
+- Estimate visual coordinates `(x3, y3)` directly from the `screenshot`
+- Execute `tap(x3, y3)`, then go to Step 5
+
+### Step 5: Verify the result
+- Call `screenshot` to confirm the UI changed as expected
+- **If the tap had no effect**: do NOT retry with the same coordinates. You MUST go back to Step 1 and call `describe_screen` again to get fresh coordinates.
+
+### When Step 2 (cross-validation) is most critical
+- Small icons near the screen edges (X close buttons, back arrows, etc.)
+- Critical or irreversible action buttons (publish, delete, share, pay, etc.)
+- Densely packed UI (list items, toolbars) where you could easily hit a neighboring element
 
 ## Skills
 
-项目自定义的 mirroir skills 存放在 `skills/` 目录下：
-- `skills/safari/` — Safari 相关操作以及tiktok操作（下载视频、保存到相册）
-- `skills/tiktok/` — TikTok 相关操作（切换账号等）
+Project-specific mirroir skills live under `skills/`:
+- `skills/tiktok/` — TikTok operations (download videos, account switching, etc.)
+- `skills/chrome/` — TikTok Shop dashboard operations via chrome-devtools MCP
+- `skills/ios/` — generic iOS operations (e.g. force-quit an app)
 
-支持 `${VAR}` 环境变量替换。
+`${VAR}` environment variable substitution is supported.
 
-**加载优先级**：项目本地 `.mirroir-mcp/skills/` > 全局 `~/.mirroir-mcp/skills/`
+**Load priority**: project-local `.mirroir-mcp/skills/` > global `~/.mirroir-mcp/skills/`
 
 ## Camera Dialog Workaround
 
