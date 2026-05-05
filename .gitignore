@@ -2,3 +2,4 @@ __pycache__/
 *.pyc
 chrome_profile/
 .claude/settings.local.json
+.mcp.json
