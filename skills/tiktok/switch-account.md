@@ -41,7 +41,10 @@ Switch to a specific TikTok account by username. The target account must already
 
 ### Part 2: Go to Profile and check current account
 
-8. Tap **Profile** at fixed coordinates **(300, 680)**. Then use `describe_screen` to check the bottom tab bar — if the **Profile** icon is **black** (filled) and the bottom bar highlight color is **white**, the tap succeeded and you are on the Profile page. If not, retry the tap until the Profile page is confirmed.
+
+8. **Precondition** — verify TikTok loaded correctly: use `describe_screen` to check that the bottom tab bar contains a **Profile** icon/label. If the Profile icon is **not** present (TikTok may not have loaded, may be showing a login wall, an interstitial, or a different screen), do not attempt to tap — kill TikTok and restart from Step 1.
+
+   Once Profile is confirmed visible, tap **Profile** at fixed coordinates **(300, 680)**. Then use `describe_screen` to check the bottom tab bar — if the **Profile** icon is **black** (filled) and the bottom bar highlight color is **white**, the tap succeeded and you are on the Profile page. If not, retry the tap until the Profile page is confirmed.
 9. If the username is not visible (e.g. the page is scrolled down showing the video grid), tap the status bar at **(47, 57)** to scroll the page back to the top (iOS native behavior).
 10. Use `describe_screen` to read the current username displayed on the Profile page (shown as "@username")
 11. **Compare** the displayed username (case-insensitive) with `${ACCOUNT_USERNAME}`:

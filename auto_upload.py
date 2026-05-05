@@ -6,7 +6,6 @@ import os
 import re
 import subprocess
 import sys
-import time
 import urllib.request
 from datetime import datetime
 
@@ -17,7 +16,16 @@ SKILLS_DIR = os.path.join(SCRIPT_DIR, "skills")
 UPLOAD_SKILL_PATH = os.path.join(SKILLS_DIR, "tiktok", "download-video-and-share-to-tiktok.md")
 SWITCH_ACCOUNT_SKILL_PATH = os.path.join(SKILLS_DIR, "tiktok", "switch-account.md")
 FAVORITE_MUSIC_SKILL_PATH = os.path.join(SKILLS_DIR, "tiktok", "favorite-music.md")
-SWITCH_SCRIPT = os.path.join(SCRIPT_DIR, "switch_to_iphone_mirroring.applescript")
+KILL_APP_SKILL_PATH = os.path.join(SKILLS_DIR, "ios", "kill-app.md")
+CLAUDE_MODEL = "claude-sonnet-4-6"
+
+
+def _load_kill_app_skill() -> str:
+    with open(KILL_APP_SKILL_PATH, "r") as f:
+        return f.read()
+
+
+KILL_APP_SKILL = _load_kill_app_skill()
 
 
 def load_config():
@@ -83,7 +91,6 @@ def fetch_pending_videos():
         video_id = extract_text(fields.get("product_id", []))
         video_urls = extract_links(fields.get("ai_video_urls", []))
         title = extract_text(fields.get("video_title", []))
-        upload_device = extract_text(fields.get("video_upload_device", []))
         post_account = extract_text(fields.get("post_account", []))
         music_url, music_name = extract_music_info(fields.get("music info", []))
         for url in video_urls:
@@ -93,7 +100,6 @@ def fetch_pending_videos():
                 "url": rewritten,
                 "title": title,
                 "record_id": record_id,
-                "upload_device": upload_device,
                 "post_account": post_account,
                 "music_url": music_url,
                 "music_name": music_name,
@@ -112,35 +118,6 @@ def update_feishu_record(record_id: str, post_time: str = "", note: str = ""):
     req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"}, method="POST")
     with urllib.request.urlopen(req) as resp:
         return json.loads(resp.read().decode())
-
-
-# Track currently connected device
-current_device = None
-
-
-def ensure_device(upload_device: str):
-    """Switch iPhone Mirroring to the target device if needed."""
-    global current_device
-    if not upload_device:
-        return
-    # Normalize: "iphone 287" -> "iPhone 287" (match System Settings menu item)
-    target = upload_device.strip()
-    if target.lower().startswith("iphone"):
-        target = "iPhone" + target[6:]
-    if current_device and current_device.lower() == target.lower():
-        print(f"  Device already connected: {current_device}")
-        return
-    print(f"  Switching device: {current_device} -> {target}")
-    proc = subprocess.run(
-        ["osascript", SWITCH_SCRIPT, target],
-        capture_output=True, text=True, timeout=60,
-    )
-    if proc.returncode != 0:
-        print(f"  Warning: switch script exited {proc.returncode}: {proc.stderr}", file=sys.stderr)
-    # Wait for connection to establish
-    time.sleep(10)
-    current_device = target
-    print(f"  Device switched to: {target}")
 
 
 # Track currently active TikTok account
@@ -164,10 +141,13 @@ def ensure_account(post_account: str):
         f"ACCOUNT_USERNAME: {target}\n\n"
         f"Execute the steps one by one using the mirroir MCP tools. "
         f"Replace ${{ACCOUNT_USERNAME}} with the username above.\n\n"
-        f"--- SKILL ---\n{skill_content}\n--- END SKILL ---"
+        f"Whenever a step requires force-quitting / killing / restarting an iPhone app, "
+        f"follow the SUPPORT SKILL: kill-app procedure below — never swipe in App Switcher manually.\n\n"
+        f"--- SKILL ---\n{skill_content}\n--- END SKILL ---\n\n"
+        f"--- SUPPORT SKILL: kill-app ---\n{KILL_APP_SKILL}\n--- END SUPPORT SKILL ---"
     )
     proc = subprocess.Popen(
-        ["claude", "-p", "--model", "claude-sonnet-4-6",
+        ["claude", "-p", "--model", CLAUDE_MODEL,
          "--verbose", "--output-format", "stream-json",
          "--allowedTools", "mcp__mirroir__*", "Bash"],
         stdin=subprocess.PIPE,
@@ -234,10 +214,13 @@ def ensure_music_favorited(music_url: str):
         f"MUSIC_URL: {music_url}\n\n"
         f"Execute the steps one by one using the mirroir MCP tools. "
         f"Replace ${{MUSIC_URL}} with the URL above.\n\n"
-        f"--- SKILL ---\n{skill_content}\n--- END SKILL ---"
+        f"Whenever a step requires force-quitting / killing / restarting an iPhone app, "
+        f"follow the SUPPORT SKILL: kill-app procedure below — never swipe in App Switcher manually.\n\n"
+        f"--- SKILL ---\n{skill_content}\n--- END SKILL ---\n\n"
+        f"--- SUPPORT SKILL: kill-app ---\n{KILL_APP_SKILL}\n--- END SUPPORT SKILL ---"
     )
     proc = subprocess.Popen(
-        ["claude", "-p", "--model", "claude-sonnet-4-6",
+        ["claude", "-p", "--model", CLAUDE_MODEL,
          "--verbose", "--output-format", "stream-json",
          "--allowedTools", "mcp__mirroir__*", "Bash"],
         stdin=subprocess.PIPE,
@@ -294,10 +277,13 @@ def upload_video(video_url: str, title: str) -> bool:
         f"VIDEO_TITLE: {title}\n\n"
         f"Execute the steps one by one using the mirroir MCP tools. "
         f"Replace ${{VIDEO_URL}} with the URL above and ${{VIDEO_TITLE}} with the title above.\n\n"
-        f"--- SKILL ---\n{skill_content}\n--- END SKILL ---"
+        f"Whenever a step requires force-quitting / killing / restarting an iPhone app, "
+        f"follow the SUPPORT SKILL: kill-app procedure below — never swipe in App Switcher manually.\n\n"
+        f"--- SKILL ---\n{skill_content}\n--- END SKILL ---\n\n"
+        f"--- SUPPORT SKILL: kill-app ---\n{KILL_APP_SKILL}\n--- END SUPPORT SKILL ---"
     )
     proc = subprocess.Popen(
-        ["claude", "-p", "--model", "claude-sonnet-4-6",
+        ["claude", "-p", "--model", CLAUDE_MODEL,
          "--verbose", "--output-format", "stream-json",
          "--allowedTools", "mcp__mirroir__*", "Bash"],
         stdin=subprocess.PIPE,
@@ -351,8 +337,7 @@ def main():
         return
 
     for i, video in enumerate(videos, 1):
-        print(f"[{i}/{len(videos)}] {video['video_id']}: {video['title'][:50]} (device: {video['upload_device']}, account: {video['post_account']}, music: {video['music_name']})")
-        ensure_device(video["upload_device"])
+        print(f"[{i}/{len(videos)}] {video['video_id']}: {video['title'][:50]} (account: {video['post_account']}, music: {video['music_name']})")
         ensure_account(video["post_account"])
         chrome_note = ensure_chrome_action(video["post_account"], video["video_id"])
         if chrome_note:

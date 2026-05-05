@@ -44,8 +44,20 @@ Project-specific mirroir skills live under `skills/`:
 
 **Load priority**: project-local `.mirroir-mcp/skills/` > global `~/.mirroir-mcp/skills/`
 
+### Mandatory: read `skills/ios/` at session start
+
+Before performing any task in this project, you **MUST** read every file under `skills/ios/`. These are cross-cutting iOS operations (force-quit, etc.) that other skills depend on. Treat their contents as authoritative — do not improvise equivalents.
+
+### Global rule: app force-quit / reset / restart
+
+Any time a skill (or you) needs to **force-quit**, **kill**, **reset**, or **restart** an iPhone app, you **MUST** invoke the [`skills/ios/kill-app.md`](skills/ios/kill-app.md) skill. **Never** manually swipe / drag in the App Switcher to dismiss a card, and never use `mcp__mirroir__reset_app`. This applies to:
+
+- Failure-recovery clauses in any skill ("force-quit X and restart")
+- Cleaning up before a fresh skill run
+- Any ad-hoc need to bounce an app
+
+If a sub-skill's text says "force-quit via App Switcher", interpret it as "invoke `skills/ios/kill-app.md` with `APP_NAME=<that app>`".
+
 ## Camera Dialog Workaround
 
 When TikTok accesses the camera via iPhone Mirroring, a system dialog "iPhone camera is not available from Mac" appears and pauses mirroring. All mirroir MCP tools will fail with "Target 'iphone' is paused".
-
-**Fix**: Run `./dismiss_camera_dialog.sh` — it screenshots the window, uses Swift Vision OCR to find the OK button, and clicks it via `cliclick`.
