@@ -5,10 +5,19 @@
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
 import urllib.request
+from datetime import datetime
+
+
+# Shadow the built-in print so every line in this module gets a HH:MM:SS prefix
+# without having to touch dozens of print() call sites.
+_real_print = print
+def print(*args, **kwargs):  # noqa: A001 — intentional builtin shadow
+    _real_print(f"[{datetime.now().strftime('%H:%M:%S')}]", *args, **kwargs)
 
 MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
 SKILLS_DIR = os.path.join(MODULE_DIR, "skills")
@@ -55,21 +64,48 @@ def _account_user_data_dir(account: str) -> str:
 
 
 def ensure_chrome_profile_for_account(account: str) -> str:
-    """Ensure chrome_profile/<account>/Default/ exists, cloning from the matching system Chrome
-    profile on first use. Returns the user-data-dir path, or '' if no profile is available."""
+    """Ensure chrome_profile/<account>/Default is a fresh recursive copy of the matching
+    system Chrome profile, so cookies / login state are inherited at copy time.
+    Returns the user-data-dir path, or '' if no matching system profile is available.
+
+    Why copy instead of symlink: Chrome's Network Service does not load cookies through a
+    Default symlink that escapes the user-data-dir tree (verified on Chrome 147 / macOS:
+    Network.getAllCookies returns 0 login cookies even though the symlinked Cookies DB
+    contains valid, decryptable session cookies). A real directory copy works.
+
+    Re-copies only when the source Cookies file is newer than the destination's, so a
+    multi-product run does not pay the copy cost on every iteration.
+
+    WARNING: do NOT have system Chrome open with this profile during the copy or while a
+    debug Chrome is using the copied profile — system Chrome may rewrite Cookies / Local
+    State concurrently. The auto_upload loop pkills its own debug Chrome between runs;
+    the user must close (or sign out of) the same account in their main Chrome before
+    running auto_upload."""
     user_data = _account_user_data_dir(account)
     profile_dst = os.path.join(user_data, "Default")
-    if os.path.isdir(profile_dst):
-        return user_data
     src_subdir = _find_system_chrome_profile_subdir(account)
     if not src_subdir:
         return ""
     src = os.path.join(CHROME_DEFAULT_USER_DIR, src_subdir)
     if not os.path.isdir(src):
         return ""
-    os.makedirs(profile_dst, exist_ok=True)
-    subprocess.run(["rsync", "-a", src + "/", profile_dst + "/"], check=True)
-    print(f"  Cloned Chrome profile for '{account}' from {src} -> {profile_dst}")
+
+    src_cookies = os.path.join(src, "Cookies")
+    dst_cookies = os.path.join(profile_dst, "Cookies")
+    if (os.path.isdir(profile_dst) and not os.path.islink(profile_dst)
+            and os.path.isfile(dst_cookies) and os.path.isfile(src_cookies)
+            and os.path.getmtime(dst_cookies) >= os.path.getmtime(src_cookies)):
+        return user_data
+
+    if os.path.islink(profile_dst):
+        os.unlink(profile_dst)
+    elif os.path.isdir(profile_dst):
+        print(f"  Removing existing {profile_dst} to refresh from system profile…")
+        shutil.rmtree(profile_dst)
+    os.makedirs(user_data, exist_ok=True)
+    print(f"  Copying Chrome profile for '{account}': {src} -> {profile_dst} (may take a while)…")
+    shutil.copytree(src, profile_dst, symlinks=True, ignore_dangling_symlinks=True)
+    print(f"  Done copying Chrome profile for '{account}'.")
     return user_data
 
 
@@ -84,17 +120,29 @@ def ensure_debug_chrome(account: str, user_data_dir: str):
     if _chrome_debug_alive() and _current_chrome_account == target:
         return
     if _chrome_debug_alive():
-        subprocess.run(["pkill", "-f", f"--user-data-dir={PROJECT_CHROME_PROFILE_DIR}"], check=False)
+        # NOTE: pattern must NOT start with '--' or pkill on macOS treats it as a flag.
+        pattern = f"user-data-dir={PROJECT_CHROME_PROFILE_DIR}"
+        subprocess.run(["pkill", "-f", pattern], check=False)
         for _ in range(10):
             time.sleep(0.5)
             if not _chrome_debug_alive():
                 break
+        if _chrome_debug_alive():
+            # SIGTERM was ignored (e.g. long-running / hung Chrome). Escalate.
+            subprocess.run(["pkill", "-9", "-f", pattern], check=False)
+            for _ in range(10):
+                time.sleep(0.5)
+                if not _chrome_debug_alive():
+                    break
     log_path = "/tmp/chrome_debug.log"
     subprocess.Popen(
         [CHROME_BIN,
          f"--user-data-dir={user_data_dir}",
          "--profile-directory=Default",
-         f"--remote-debugging-port={CHROME_DEBUG_PORT}"],
+         f"--remote-debugging-port={CHROME_DEBUG_PORT}",
+         # Skip auto-downloading multi-GB on-device ML models / heuristics we don't use.
+         "--disable-features=OptimizationGuideOnDeviceModel,OptimizationHints,WasmTtsComponentUpdater,SafeBrowsingOnDeviceTailoredSecurity",
+         "--disable-component-update"],
         stdout=open(log_path, "ab"),
         stderr=subprocess.STDOUT,
         start_new_session=True,
@@ -108,6 +156,16 @@ def ensure_debug_chrome(account: str, user_data_dir: str):
 
 
 NON_AFFILIATE_NOTE = "此商品不是联盟营销商品。请联系卖家，以将其注册到联盟计划中"
+VERIFY_FAILED_PREFIX = "VERIFY_FAILED_PRODUCT_NOT_IN_SHOWCASE:"
+
+
+def _scan_note(text: str, product_id: str) -> str:
+    """Map a chunk of skill output to a non-empty note string, or '' if nothing matched."""
+    if "NON_AFFILIATE_PRODUCT:" in text:
+        return NON_AFFILIATE_NOTE
+    if VERIFY_FAILED_PREFIX in text:
+        return f"商品 {product_id} 提交后未在橱窗 DOM 中找到，疑似未添加成功"
+    return ""
 
 
 def ensure_chrome_action(post_account: str, product_id: str) -> str:
@@ -137,7 +195,7 @@ def ensure_chrome_action(post_account: str, product_id: str) -> str:
         f"--- SKILL ---\n{skill_content}\n--- END SKILL ---"
     )
     proc = subprocess.Popen(
-        ["claude", "-p", "--model", "claude-sonnet-4-6",
+        ["claude", "-p", "--model", "claude-haiku-4-5-20251001",
          "--verbose", "--output-format", "stream-json",
          "--allowedTools", "mcp__chrome-devtools__*", "Bash"],
         stdin=subprocess.PIPE,
@@ -165,8 +223,8 @@ def ensure_chrome_action(post_account: str, product_id: str) -> str:
                 if block.get("type") == "text" and block.get("text"):
                     text = block["text"]
                     print(f"  {text}", flush=True)
-                    if not note and ("NON_AFFILIATE_PRODUCT:" in text):
-                        note = NON_AFFILIATE_NOTE
+                    if not note:
+                        note = _scan_note(text, product_id)
                 elif block.get("type") == "tool_use":
                     name = block.get("name", "")
                     inp = json.dumps(block.get("input", {}), ensure_ascii=False)
@@ -178,13 +236,13 @@ def ensure_chrome_action(post_account: str, product_id: str) -> str:
                     if c.get("type") == "text":
                         text = c.get("text", "")
                         print(f"     = {text[:200]}", flush=True)
-                        if not note and ("NON_AFFILIATE_PRODUCT:" in text):
-                            note = NON_AFFILIATE_NOTE
+                        if not note:
+                            note = _scan_note(text, product_id)
         elif etype == "result":
             text = str(event.get("result", ""))
             print(f"  Result: {text[:300]}", flush=True)
-            if not note and ("NON_AFFILIATE_PRODUCT:" in text):
-                note = NON_AFFILIATE_NOTE
+            if not note:
+                note = _scan_note(text, product_id)
 
     proc.wait()
     if proc.returncode != 0:

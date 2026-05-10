@@ -51,12 +51,34 @@ Add a product (by `PRODUCT_ID`) to the showcase of `${POST_ACCOUNT}`'s TikTok Sh
       Do NOT text-match the Chinese error in the snapshot — the toast may not render in the a11y tree, and quoting the string in your own narrative would false-trigger the caller's regex.
     - **Enabled (no `disabled`)** → continue. Capture this submit button's uid as **`S`**.
 
-### Part 4: Submit and close
+### Part 4: Submit, close, and verify by PRODUCT_ID
 
-11. `click S` with `includeSnapshot=true`. From the returned snapshot, verify ONE of these terminal states:
-    - The product card now shows an `"已添加"` badge (already-in-showcase de-dupe; treat as success), OR
-    - The showcase counter `"商品橱窗共有 N 件商品"` increased vs. `before_count` from Step 4.
+11. `click S` to submit. The dialog stays open after success.
+12. `click C` (or the top-right `×`) to close the dialog. `take_snapshot` and confirm `tabpanel "商品链接"` is gone — this guarantees the next `evaluate_script` runs against the showcase list DOM, not the dialog.
+13. Verify the product is in the showcase. Run `evaluate_script` with this exact function (replace `${PRODUCT_ID}` with the real id before submitting the call). The check scans the **entire showcase page DOM** (HTML attributes, text, etc.) for the literal PRODUCT_ID string — TikTok Shop's showcase rows do NOT use `<a href>` links to the product page, so a href-only scan would always return 0 and false-fail. A 19-digit numeric product id is unique enough that any occurrence anywhere on the page is a valid signal:
 
-    Neither → report the snapshot's relevant text verbatim (likely an error toast).
-12. The dialog does NOT auto-close. `click C` (or the top-right `×`) to close it. `take_snapshot` and confirm `tabpanel "商品链接"` is gone.
-13. Stop. Report: "Product ${PRODUCT_ID} submit completed (state: <已添加 / counter +1 / verbatim>)."
+    ```js
+    () => {
+      const id = '${PRODUCT_ID}';
+      const html = document.body.innerHTML || '';
+      const text = document.body.innerText || '';
+      const count = (html.match(new RegExp(id, 'g')) || []).length;
+      return { count, inVisibleText: text.includes(id) };
+    }
+    ```
+
+    - `count >= 1` → product is in the showcase DOM. **Verified success.** Continue to Step 15.
+    - `count == 0` → list may not have refreshed yet. Go to Step 14.
+
+14. Reload and retry once:
+    - `navigate_page` (type=reload).
+    - `wait_for` text `["商品橱窗共有", "Showcase"]`, timeout 15000.
+    - Re-run the same `evaluate_script` from Step 13.
+    - `count >= 1` → verified success.
+    - `count == 0` → emit this exact final line and stop the skill:
+
+      `VERIFY_FAILED_PRODUCT_NOT_IN_SHOWCASE: ${PRODUCT_ID}`
+
+      Do NOT quote this string in any earlier narrative — only emit it once at the end so the caller's regex matches deterministically.
+
+15. Stop. Report: "Product ${PRODUCT_ID} added successfully (verified by id; count=N occurrences in showcase DOM, inVisibleText=true/false)."

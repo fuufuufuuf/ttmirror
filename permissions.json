@@ -1,4 +1,5 @@
 {
-  "allow": ["*"],
-  "blockedApps": ["Wallet", "PayPal", "Venmo"]
+  "allow": ["tap", "swipe", "drag", "long_press", "double_tap", "type_text", "press_key", "launch_app"],
+  "deny": [],
+  "blockedApps": ["Wallet", "Banking"]
 }

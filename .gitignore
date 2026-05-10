@@ -3,3 +3,4 @@ __pycache__/
 chrome_profile/
 .claude/settings.local.json
 .mcp.json
+logs/
