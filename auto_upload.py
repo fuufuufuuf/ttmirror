@@ -10,7 +10,7 @@ import time
 import urllib.request
 from datetime import datetime
 
-from chrome_action import ensure_chrome_action
+from chrome_action import ensure_chrome_action, NOT_LOGGED_IN_NOTE
 
 
 # Shadow the built-in print so every line in this module gets a HH:MM:SS prefix
@@ -132,6 +132,26 @@ def update_feishu_record(record_id: str, post_time: str = "", note: str = ""):
     req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"}, method="POST")
     with urllib.request.urlopen(req) as resp:
         return json.loads(resp.read().decode())
+
+
+def _mirroring_running() -> bool:
+    return subprocess.run(["pgrep", "-x", "iPhone Mirroring"],
+                          capture_output=True).returncode == 0
+
+
+def ensure_mirroring() -> bool:
+    """Make sure the iPhone Mirroring app is running. If not, launch it and wait
+    up to 10s for the process to appear. Returns True on success, False if it
+    refused to come up (e.g. iPhone locked, mirroring not paired, OS denial)."""
+    if _mirroring_running():
+        return True
+    print("  iPhone Mirroring not running; launching…")
+    subprocess.run(["open", "-a", "iPhone Mirroring"], check=False)
+    for _ in range(20):
+        time.sleep(0.5)
+        if _mirroring_running():
+            return True
+    return False
 
 
 # Track currently connected iPhone Mirroring device
@@ -437,9 +457,26 @@ def main():
 
     for i, video in enumerate(videos, 1):
         print(f"[{i}/{len(videos)}] {video['video_id']}: {video['title'][:50]} (device: {video['upload_device']}, account: {video['post_account']}, music: {video['music_name']})")
+        if not ensure_mirroring():
+            print(f"  iPhone Mirroring failed to launch; skipping video.", file=sys.stderr)
+            try:
+                update_feishu_record(video["record_id"], post_time="N/A", note="iphone mirror not open")
+            except Exception as e:
+                print(f"  Feishu update failed: {e}\n", file=sys.stderr)
+            continue
         ensure_device(video["upload_device"])
         ensure_account(video["post_account"])
         chrome_note = ensure_chrome_action(video["post_account"], video["video_id"])
+        if chrome_note == NOT_LOGGED_IN_NOTE:
+            # Login state for this account is dead — fallback upload would post under the
+            # wrong account context; better to skip and let the user re-login + retry.
+            print(f"  Account '{video['post_account']}' is not logged in; skipping video.",
+                  file=sys.stderr)
+            try:
+                update_feishu_record(video["record_id"], post_time="N/A", note=chrome_note)
+            except Exception as e:
+                print(f"  Feishu update failed: {e}\n", file=sys.stderr)
+            continue
         if chrome_note:
             print(f"  Product add failed ({chrome_note}); falling back to "
                   f"original-audio upload (no product link).")
@@ -473,5 +510,35 @@ def main():
     print("All videos uploaded.")
 
 
+INTERVAL_SECONDS = 3600
+
+
+def loop_forever():
+    """Run main() in a loop, sleeping INTERVAL_SECONDS between iterations.
+    Exceptions in a single iteration are caught and logged so the loop never dies."""
+    while True:
+        cycle_start = datetime.now()
+        print(f"\n=== cycle start: {cycle_start:%Y-%m-%d %H:%M:%S} ===")
+        try:
+            main()
+        except KeyboardInterrupt:
+            print("\nInterrupted; exiting loop.")
+            return
+        except Exception as e:
+            print(f"!! cycle crashed: {type(e).__name__}: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc()
+        print(f"=== cycle end: {datetime.now():%Y-%m-%d %H:%M:%S} ===")
+        print(f"=== sleeping {INTERVAL_SECONDS}s until next cycle ===\n", flush=True)
+        try:
+            time.sleep(INTERVAL_SECONDS)
+        except KeyboardInterrupt:
+            print("\nInterrupted during sleep; exiting loop.")
+            return
+
+
 if __name__ == "__main__":
-    main()
+    if "--once" in sys.argv:
+        main()
+    else:
+        loop_forever()

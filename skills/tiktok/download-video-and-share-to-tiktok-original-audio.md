@@ -69,7 +69,7 @@ The aim is to still get the video posted (just degraded) instead of dropping it.
 10. Tap "DOWNLOAD". Wait for the "Download complete" banner to appear at the bottom of the screen
 11. Tap "OPEN IN..." on the download complete banner to open the share sheet
 12. Wait for the share sheet to appear
-13. Use `describe_screen` `omit_screenshot: true` to check if "TikTok" is in the app icon row. If not visible, swipe right (from_x=200, to_x=50, duration 1000ms) on the app row to reveal more apps, then `describe_screen` `omit_screenshot: true` again. Repeat until "TikTok" appears, then tap it.
+13. Use `describe_screen` `omit_screenshot: true` to check if "TikTok" is in the app icon row. If not visible, swipe the row with `mcp__mirroir__swipe(from_x=50, from_y=460, to_x=300, to_y=460, duration_ms=1000)` — a single swipe of this magnitude typically jumps to the end of the row where TikTok lives. **Never** call it in the reverse direction (e.g. `from_x=200, to_x=50`): empirically, short leftward swipes are silently dropped by mirroir; only low-to-high X reliably advances the row. After each swipe, `describe_screen` `omit_screenshot: true` to verify. Repeat the same call (not the reverse) until "TikTok" appears, then tap it.
 14. Wait for TikTok to open. A "Share on TikTok" modal appears with **Video** and **Message** buttons. Use `describe_screen` `omit_screenshot: true` to locate the "Video" button, then tap it to enter the video editing flow.
 
 ### Part 3: Go directly to Next

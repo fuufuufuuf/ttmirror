@@ -64,7 +64,7 @@ Download a video from a URL in Chrome and share it directly to TikTok for postin
 10. Tap "DOWNLOAD". Wait for the "Download complete" banner to appear at the bottom of the screen
 11. Tap "OPEN IN..." on the download complete banner to open the share sheet
 12. Wait for the share sheet to appear
-13. Use `describe_screen` `omit_screenshot: true` to check if "TikTok" is in the app icon row. If not visible, swipe right (from_x=200, to_x=50, duration 1000ms) on the app row to reveal more apps, then `describe_screen` `omit_screenshot: true` again. Repeat until "TikTok" appears, then tap it.
+13. Use `describe_screen` `omit_screenshot: true` to check if "TikTok" is in the app icon row. If not visible, swipe the row with `mcp__mirroir__swipe(from_x=50, from_y=460, to_x=300, to_y=460, duration_ms=1000)` — a single swipe of this magnitude typically jumps to the end of the row where TikTok lives. **Never** call it in the reverse direction (e.g. `from_x=200, to_x=50`): empirically, short leftward swipes are silently dropped by mirroir; only low-to-high X reliably advances the row. After each swipe, `describe_screen` `omit_screenshot: true` to verify. Repeat the same call (not the reverse) until "TikTok" appears, then tap it.
 14. Wait for TikTok to open. A "Share on TikTok" modal appears with **Video** and **Message** buttons. Use `describe_screen` `omit_screenshot: true` to locate the "Video" button, then tap it to enter the video editing flow.
 
 ### Part 3: Touch the sound picker (clear default music if any) → Next
@@ -73,7 +73,7 @@ Don't pick a song yet — that happens in Part 6. But TikTok sometimes auto-atta
 
 15. Use `describe_screen` `omit_screenshot: true` to locate **`/ Add sound`** (or **`Add sound`**) at the top center (~`(167, 113)`). Tap it. The sound picker opens (Commercial Sounds sheet on top).
 16. Dismiss the picker by tapping the upper video-preview area (~`(167, 200)`). The video editor reappears.
-17. `describe_screen` `omit_screenshot: true` and look for a `♪ <song name> ×` chip at the top of the editor — that means TikTok auto-attached a default song. If the chip is present, tap the **`×`** on it to detach. If no such chip exists, do nothing and continue to Step 18.
+17. `describe_screen` `omit_screenshot: false` and look for a `♪ <song name> ×` chip at the top of the editor — that means TikTok auto-attached a default song. If the chip is present, tap the **`×`** on it to detach. Then `describe_screen` `omit_screenshot: true` again to verify the chip is gone. If the chip is **still present**, tap the **`×`** again and re-verify. Repeat until the chip is no longer visible. If no such chip existed in the first place, do nothing and continue to Step 18.
 18. Tap **Next** directly at fixed coordinates **(248, 680)**. The OCR returns incorrect Y for this button.
 19. Wait for the post editing screen (caption, hashtags).
 

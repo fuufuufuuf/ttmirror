@@ -73,8 +73,11 @@ def ensure_chrome_profile_for_account(account: str) -> str:
     Network.getAllCookies returns 0 login cookies even though the symlinked Cookies DB
     contains valid, decryptable session cookies). A real directory copy works.
 
-    Re-copies only when the source Cookies file is newer than the destination's, so a
-    multi-product run does not pay the copy cost on every iteration.
+    Re-copies only when the source Cookies has been modified since the last copy.
+    A sidecar marker file (`.src_cookies_mtime`) records the source's mtime AT COPY TIME.
+    Comparing against dst's own mtime would be unreliable: the debug Chrome rewrites dst
+    Cookies during a run, making dst always newer than src — which would silently block
+    re-copy forever even after the user re-logs into system Chrome.
 
     WARNING: do NOT have system Chrome open with this profile during the copy or while a
     debug Chrome is using the copied profile — system Chrome may rewrite Cookies / Local
@@ -91,11 +94,28 @@ def ensure_chrome_profile_for_account(account: str) -> str:
         return ""
 
     src_cookies = os.path.join(src, "Cookies")
-    dst_cookies = os.path.join(profile_dst, "Cookies")
+    if not os.path.isfile(src_cookies):
+        return ""
+    marker_path = os.path.join(user_data, ".src_cookies_mtime")
+    src_mtime = os.path.getmtime(src_cookies)
+
     if (os.path.isdir(profile_dst) and not os.path.islink(profile_dst)
-            and os.path.isfile(dst_cookies) and os.path.isfile(src_cookies)
-            and os.path.getmtime(dst_cookies) >= os.path.getmtime(src_cookies)):
-        return user_data
+            and os.path.isfile(marker_path)):
+        try:
+            with open(marker_path) as f:
+                recorded_mtime = float(f.read().strip())
+            if recorded_mtime >= src_mtime:
+                return user_data
+        except (ValueError, OSError):
+            pass  # marker corrupt → fall through to re-copy
+
+    # Guard: refuse to copy while the user's main Chrome is open. Concurrent writes to
+    # Cookies / Local State during a copy produce dirty clones whose login state is
+    # silently dead — we hit this multiple times before adding this check.
+    if subprocess.run(["pgrep", "-x", "Google Chrome"], capture_output=True).returncode == 0:
+        print(f"  System Chrome is running; refusing to copy profile for '{account}'. "
+              f"Quit Chrome (Cmd+Q) and re-run.")
+        return ""
 
     if os.path.islink(profile_dst):
         os.unlink(profile_dst)
@@ -105,6 +125,8 @@ def ensure_chrome_profile_for_account(account: str) -> str:
     os.makedirs(user_data, exist_ok=True)
     print(f"  Copying Chrome profile for '{account}': {src} -> {profile_dst} (may take a while)…")
     shutil.copytree(src, profile_dst, symlinks=True, ignore_dangling_symlinks=True)
+    with open(marker_path, "w") as f:
+        f.write(f"{src_mtime}\n")
     print(f"  Done copying Chrome profile for '{account}'.")
     return user_data
 
@@ -135,11 +157,20 @@ def ensure_debug_chrome(account: str, user_data_dir: str):
                 if not _chrome_debug_alive():
                     break
     log_path = "/tmp/chrome_debug.log"
+    # Touch the "First Run" sentinel so Chrome treats this profile as already-onboarded.
+    # Without it, even with --no-first-run flag, some Chrome builds still show signin/welcome.
+    open(os.path.join(user_data_dir, "First Run"), "a").close()
+
     subprocess.Popen(
         [CHROME_BIN,
          f"--user-data-dir={user_data_dir}",
          "--profile-directory=Default",
          f"--remote-debugging-port={CHROME_DEBUG_PORT}",
+         # Suppress first-run / default-browser / EU search-engine choice dialogs that
+         # block chrome-devtools MCP from interacting with the actual page.
+         "--no-first-run",
+         "--no-default-browser-check",
+         "--disable-search-engine-choice-screen",
          # Skip auto-downloading multi-GB on-device ML models / heuristics we don't use.
          "--disable-features=OptimizationGuideOnDeviceModel,OptimizationHints,WasmTtsComponentUpdater,SafeBrowsingOnDeviceTailoredSecurity",
          "--disable-component-update"],
@@ -157,6 +188,18 @@ def ensure_debug_chrome(account: str, user_data_dir: str):
 
 NON_AFFILIATE_NOTE = "此商品不是联盟营销商品。请联系卖家，以将其注册到联盟计划中"
 VERIFY_FAILED_PREFIX = "VERIFY_FAILED_PRODUCT_NOT_IN_SHOWCASE:"
+# Sentinel value — caller compares chrome_note against this constant to decide whether
+# to skip the video entirely (vs. falling back to original-audio upload).
+NOT_LOGGED_IN_NOTE = "TikTok Shop 登录态失效，需要重新登录系统 Chrome 对应 profile"
+
+# URL fragments seen when the cloned profile has expired/invalid session and TikTok
+# redirects the showcase URL to a generic creator dashboard / login wall.
+_LOGIN_REDIRECT_FRAGMENTS = (
+    "business.tiktokshop.com/us/creator/live",
+    "ttp_session_expire",
+    "accounts.tiktok.com/login",
+    "seller-us-accounts.tiktok.com/account/register",
+)
 
 
 def _scan_note(text: str, product_id: str) -> str:
@@ -165,6 +208,8 @@ def _scan_note(text: str, product_id: str) -> str:
         return NON_AFFILIATE_NOTE
     if VERIFY_FAILED_PREFIX in text:
         return f"商品 {product_id} 提交后未在橱窗 DOM 中找到，疑似未添加成功"
+    if any(frag in text for frag in _LOGIN_REDIRECT_FRAGMENTS):
+        return NOT_LOGGED_IN_NOTE
     return ""
 
 

@@ -14,9 +14,12 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 LOCK_FILE = "/tmp/auto_upload.lock"
 LOG_DIR = os.path.join(SCRIPT_DIR, "logs")
 
-# cron's PATH is minimal — make sure `claude` and homebrew binaries resolve.
+# launchd's PATH is minimal — make sure `claude`, homebrew, and nvm-managed
+# `node`/`npx` resolve. The latter is needed for the chrome-devtools MCP server,
+# which is spawned via `npx -y chrome-devtools-mcp@latest`.
 os.environ["PATH"] = ":".join([
     "/Users/tikaitongku/.local/bin",
+    "/Users/tikaitongku/.nvm/versions/node/v24.14.0/bin",
     "/opt/homebrew/bin",
     os.environ.get("PATH", "/usr/bin:/bin"),
 ])
@@ -35,6 +38,23 @@ except BlockingIOError:
 with open(log_path, "a") as f:
     f.write(f"\n[{datetime.now():%Y-%m-%d %H:%M:%S}] === start ===\n")
     f.flush()
+
+    # Pre-flight: confirm claude CLI can authenticate from this launchd subprocess
+    # context. Skip the entire run otherwise — better to leave videos pending for the
+    # next hour than to mark them all N/A. Observed failure: launchd subprocess sees
+    # "Not logged in" intermittently even though the keychain entry is valid in the
+    # user's shell.
+    preflight = subprocess.run(
+        ["claude", "-p", "--model", "claude-haiku-4-5-20251001", "say ok"],
+        stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=60,
+    )
+    combined = preflight.stdout + preflight.stderr
+    if preflight.returncode != 0 or "Not logged in" in combined:
+        f.write(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] preflight failed "
+                f"(exit={preflight.returncode}): {combined.strip()[:300]}\n")
+        f.write(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] === end (skipped: claude auth) ===\n")
+        sys.exit(0)
+
     proc = subprocess.run(
         [sys.executable, os.path.join(SCRIPT_DIR, "auto_upload.py")],
         cwd=SCRIPT_DIR, stdout=f, stderr=subprocess.STDOUT,
