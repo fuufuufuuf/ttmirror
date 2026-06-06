@@ -1,6 +1,6 @@
 """Per-account Chrome control: clones the matching system Chrome profile to
 ``chrome_profile/<account>/Default/`` on first use, runs a dedicated debug Chrome on
-``CHROME_DEBUG_PORT``, and dispatches the chrome-devtools MCP skill via ``claude -p``."""
+``CHROME_DEBUG_PORT``, and dispatches the chrome-devtools MCP skill via Codex."""
 
 import json
 import os
@@ -11,6 +11,8 @@ import sys
 import time
 import urllib.request
 from datetime import datetime
+
+from codex_runner import CODEX_MODEL, stream_codex
 
 
 # Shadow the built-in print so every line in this module gets a HH:MM:SS prefix
@@ -249,59 +251,23 @@ def ensure_chrome_action(post_account: str, product_id: str) -> str:
         f"Replace ${{PRODUCT_ID}} and ${{POST_ACCOUNT}} with the values above.\n\n"
         f"--- SKILL ---\n{skill_content}\n--- END SKILL ---"
     )
-    proc = subprocess.Popen(
-        ["claude", "-p", "--model", "claude-haiku-4-5-20251001",
-         "--verbose", "--output-format", "stream-json",
-         "--allowedTools", "mcp__chrome-devtools__*", "Bash"],
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=sys.stderr,
-        cwd=MODULE_DIR,
-        text=True,
-        bufsize=1,
-    )
-    proc.stdin.write(prompt)
-    proc.stdin.close()
-
     note = ""
-    for line in proc.stdout:
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            event = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        etype = event.get("type")
-        if etype == "assistant":
-            for block in event.get("message", {}).get("content", []):
-                if block.get("type") == "text" and block.get("text"):
-                    text = block["text"]
-                    print(f"  {text}", flush=True)
-                    if not note:
-                        note = _scan_note(text, product_id)
-                elif block.get("type") == "tool_use":
-                    name = block.get("name", "")
-                    inp = json.dumps(block.get("input", {}), ensure_ascii=False)
-                    print(f"  -> {name}({inp})", flush=True)
-        elif etype == "tool_result":
-            content = event.get("content", "")
-            if isinstance(content, list):
-                for c in content:
-                    if c.get("type") == "text":
-                        text = c.get("text", "")
-                        print(f"     = {text[:200]}", flush=True)
-                        if not note:
-                            note = _scan_note(text, product_id)
-        elif etype == "result":
-            text = str(event.get("result", ""))
-            print(f"  Result: {text[:300]}", flush=True)
-            if not note:
-                note = _scan_note(text, product_id)
 
-    proc.wait()
-    if proc.returncode != 0:
-        print(f"  Warning: chrome action exited {proc.returncode}", file=sys.stderr)
+    def _scan(text: str) -> None:
+        nonlocal note
         if not note:
-            note = f"chrome action exit {proc.returncode}"
+            note = _scan_note(text, product_id)
+
+    result = stream_codex(
+        prompt,
+        cwd=MODULE_DIR,
+        model=CODEX_MODEL,
+        print_func=print,
+        on_text=_scan,
+    )
+
+    if result.returncode != 0:
+        print(f"  Warning: chrome action exited {result.returncode}", file=sys.stderr)
+        if not note:
+            note = f"chrome action exit {result.returncode}"
     return note

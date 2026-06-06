@@ -51,9 +51,9 @@ The aim is to still get the video posted (just degraded) instead of dropping it.
 2. Press **Cmd+3** to open Spotlight Search. The search field is auto-focused — **do NOT tap it** (the tap is unreliable and unnecessary).
 3. `type_text` `chrome` directly, then press **Return** to launch chrome.
 4. Wait for chrome to appear
-5. Open a new tab with **Cmd+T**
+5. Open a new tab with **Cmd+T**.
 6. Press **Cmd+L** to focus the address bar, then press **Cmd+A** + **Delete** to clear any stale text in the address bar (no-op if already empty).
-7. Type the URL directly with `type_text` `${VIDEO_URL}`, then press **Return** to navigate. Do **not** use `pbcopy` + Cmd+V — Universal Clipboard does not sync from script-driven `pbcopy` to iOS via iPhone Mirroring, so Cmd+V will paste a stale value. Wait for the page to load, then `describe_screen` `omit_screenshot: true` to verify: the address bar host is the expected domain (e.g. `res.cloudinary.com`) and expected content is visible (e.g. a `DOWNLOAD` button + `<filename>.mp4 (<size>)`).
+7. Type the URL directly with `type_text` `${VIDEO_URL}`, then `press_key` using `key: "return"` to navigate. Do **not** use `pbcopy` + Cmd+V — Universal Clipboard does not sync from script-driven `pbcopy` to iOS via iPhone Mirroring, so Cmd+V will paste a stale value. Wait for the page to load, then `describe_screen` `omit_screenshot: true` to verify: the address bar host is the expected domain (e.g. `res.cloudinary.com`) and expected content is visible (e.g. a `DOWNLOAD` button + `<filename>.mp4 (<size>)`).
 
 ### Part 2: Share video to TikTok
 

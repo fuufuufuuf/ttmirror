@@ -1,0 +1,11 @@
+[mcp_servers.mirroir]
+command = "/Users/haowang/mirroir-mcp-0.33.3/.build/release/mirroir-mcp"
+args = ["-y", "mirroir-mcp"]
+
+
+[mcp_servers.chrome-devtools]
+command = "npx"
+args = ["-y", "chrome-devtools-mcp@latest", "--browserUrl=http://localhost:9222"]
+startup_timeout_sec = 30
+tool_timeout_sec = 180
+default_tools_approval_mode = "approve"

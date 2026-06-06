@@ -10,14 +10,18 @@ import subprocess
 import sys
 from datetime import datetime
 
+from codex_runner import CODEX_MODEL, run_codex_text
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 LOCK_FILE = "/tmp/auto_upload.lock"
 LOG_DIR = os.path.join(SCRIPT_DIR, "logs")
 
-# launchd's PATH is minimal — make sure `claude`, homebrew, and nvm-managed
+# launchd's PATH is minimal — make sure `codex`, homebrew, and nvm-managed
 # `node`/`npx` resolve. The latter is needed for the chrome-devtools MCP server,
 # which is spawned via `npx -y chrome-devtools-mcp@latest`.
 os.environ["PATH"] = ":".join([
+    "/Users/haowang/.nvm/versions/node/v22.22.1/bin",
+    "/Users/haowang/.local/bin",
     "/Users/tikaitongku/.local/bin",
     "/Users/tikaitongku/.nvm/versions/node/v24.14.0/bin",
     "/opt/homebrew/bin",
@@ -39,20 +43,21 @@ with open(log_path, "a") as f:
     f.write(f"\n[{datetime.now():%Y-%m-%d %H:%M:%S}] === start ===\n")
     f.flush()
 
-    # Pre-flight: confirm claude CLI can authenticate from this launchd subprocess
+    # Pre-flight: confirm Codex CLI can authenticate from this launchd subprocess
     # context. Skip the entire run otherwise — better to leave videos pending for the
-    # next hour than to mark them all N/A. Observed failure: launchd subprocess sees
-    # "Not logged in" intermittently even though the keychain entry is valid in the
-    # user's shell.
-    preflight = subprocess.run(
-        ["claude", "-p", "--model", "claude-haiku-4-5-20251001", "say ok"],
-        stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=60,
+    # next hour than to mark them all N/A.
+    preflight = run_codex_text(
+        "Respond with exactly: ok",
+        cwd=SCRIPT_DIR,
+        model=CODEX_MODEL,
+        sandbox="read-only",
+        timeout=60,
     )
-    combined = preflight.stdout + preflight.stderr
-    if preflight.returncode != 0 or "Not logged in" in combined:
+    combined = f"{preflight.text}\n{preflight.stderr}"
+    if preflight.returncode != 0 or preflight.text.strip().lower() != "ok":
         f.write(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] preflight failed "
                 f"(exit={preflight.returncode}): {combined.strip()[:300]}\n")
-        f.write(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] === end (skipped: claude auth) ===\n")
+        f.write(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] === end (skipped: codex auth) ===\n")
         sys.exit(0)
 
     proc = subprocess.run(

@@ -45,9 +45,9 @@ Download a video from a URL in Chrome and share it directly to TikTok for postin
 2. Press **Cmd+3** to open Spotlight Search. The search field is auto-focused — **do NOT tap it** (the tap is unreliable and unnecessary).
 3. `type_text` `chrome` directly, then press **Return** to launch chrome.
 4. Wait for chrome to appear
-5. Open a new tab with **Cmd+T**
+5. Open a new tab with **Cmd+T**.
 6. Press **Cmd+L** to focus the address bar, then press **Cmd+A** + **Delete** to clear any stale text in the address bar (no-op if already empty).
-7. Type the URL directly with `type_text` `${VIDEO_URL}`, then press **Return** to navigate. Do **not** use `pbcopy` + Cmd+V — Universal Clipboard does not sync from script-driven `pbcopy` to iOS via iPhone Mirroring, so Cmd+V will paste a stale value. Wait for the page to load, then `describe_screen` `omit_screenshot: true` to verify: the address bar host is the expected domain (e.g. `res.cloudinary.com`) and expected content is visible (e.g. a `DOWNLOAD` button + `<filename>.mp4 (<size>)`).
+7. Type the URL directly with `type_text` `${VIDEO_URL}`, then `press_key` using `key: "return"` to navigate. Do **not** use `pbcopy` + Cmd+V — Universal Clipboard does not sync from script-driven `pbcopy` to iOS via iPhone Mirroring, so Cmd+V will paste a stale value. Wait for the page to load, then `describe_screen` `omit_screenshot: true` to verify: the address bar host is the expected domain (e.g. `res.cloudinary.com`) and expected content is visible (e.g. a `DOWNLOAD` button + `<filename>.mp4 (<size>)`).
 
 ### Part 2: Share video to TikTok
 
@@ -102,4 +102,3 @@ The flow has a quirk: tapping "Add sound" first lands on the **Commercial Sounds
 36. Wait until the post editor is **gone** — the screen transitions to the TikTok feed / profile (or shows a "Posted" / "Uploading..." indicator briefly). Verify via `describe_screen` `omit_screenshot: true`: the `"Add description..."` field and the `"Drafts"` / `"Post"` buttons must NOT be visible anymore.
 37. If a "Save to drafts?" / "Discard?" prompt appears instead of a successful publish, the post failed — emit `UPLOAD_VIDEO_ABORTED: Save-to-drafts/Discard prompt appeared after Post` and stop. Do NOT auto-discard or auto-save.
 38. **Emit the success marker** as the final line: `UPLOAD_VIDEO_POSTED: ${VIDEO_URL}`. This is the only signal the caller uses to mark the Feishu record as posted. Without this marker, the caller treats the run as a silent abort and writes a failure note instead.
-
