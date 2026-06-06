@@ -18,8 +18,7 @@ Switch to a specific TikTok account by username. The target account must already
 - **Coordinates**: **MUST** use `describe_screen` to get tap coordinates — never estimate from screenshot pixels. `screenshot` is only for visual verification, not for locating tap targets.
 - **Image bandwidth**: every `screenshot` and every `describe_screen` (without `omit_screenshot: true`) sends a ~400KB image to the model and adds ~500ms-1s per call. Pass `omit_screenshot: true` whenever you only need OCR text / coordinates (the typical "find element to tap" case). Reserve full images for steps that explicitly call out **visual analysis** below (icon color, etc.). Never call `screenshot` immediately after `describe_screen` — describe_screen's default response already includes the same frame.
 - **Failure recovery**: If any step fails or the UI is not in the expected state, **do NOT try alternative approaches, workarounds, or ad-hoc recovery**. Immediately kill TikTok (force-quit via App Switcher or `killall` equivalent) and restart the entire skill from **Step 1**.
-- **Fixed coordinates**:
-  - **Profile** tab: **(300, 680)**
+
 - **Keyboard shortcuts** (iPhone Mirroring):
   - **Cmd+1**: Home Screen
   - **Cmd+2**: App Switcher
@@ -45,7 +44,7 @@ Switch to a specific TikTok account by username. The target account must already
 
 8. **Precondition** — verify TikTok loaded correctly: use `describe_screen` `omit_screenshot: true` to check that the bottom tab bar contains a **Profile** icon/label. If the Profile icon is **not** present (TikTok may not have loaded, may be showing a login wall, an interstitial, or a different screen), do not attempt to tap — kill TikTok and restart from Step 1.
 
-   Once Profile is confirmed visible, tap **Profile** at fixed coordinates **(300, 680)**. Then use `describe_screen` (with default `omit_screenshot: false` — visual analysis required: judging Profile icon "black/filled" vs highlight color cannot be done from OCR text alone) to check the bottom tab bar — if the **Profile** icon is **black** (filled) and the bottom bar highlight color is **white**, the tap succeeded and you are on the Profile page. If not, retry the tap until the Profile page is confirmed.
+   Once Profile is confirmed visible, tap **Profile**. Then use `describe_screen` (with default `omit_screenshot: false` — visual analysis required: judging Profile icon "black/filled" vs highlight color cannot be done from OCR text alone) to check the bottom tab bar — if the **Profile** icon is **black** (filled) and the bottom bar highlight color is **white**, the tap succeeded and you are on the Profile page. If not, retry the tap until the Profile page is confirmed.
 9. If the username is not visible (e.g. the page is scrolled down showing the video grid), tap the status bar at **(47, 57)** to scroll the page back to the top (iOS native behavior).
 10. Use `describe_screen` `omit_screenshot: true` to read the current username displayed on the Profile page (shown as "@username")
 11. **Compare** the displayed username (case-insensitive) with `${ACCOUNT_USERNAME}`:

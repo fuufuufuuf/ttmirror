@@ -10,7 +10,7 @@ import time
 import urllib.request
 from datetime import datetime
 
-from chrome_action import ensure_chrome_action, NOT_LOGGED_IN_NOTE
+from chrome_action import ensure_chrome_action, has_chrome_profile_for_account, NOT_LOGGED_IN_NOTE
 
 
 # Shadow the built-in print so every line in this module gets a HH:MM:SS prefix
@@ -52,7 +52,12 @@ def rewrite_url(url: str, video_id: str) -> str:
     match = re.match(pattern, url)
     if not match:
         return url
-    return f"{match.group(1)}/fl_attachment:{video_id}/{match.group(2)}"
+    # Cloudinary: `fl_attachment:` with an empty filename is rejected as a malformed
+    # transformation (returns no playable / downloadable response). Fall back to bare
+    # `fl_attachment` (use original filename) when video_id is empty — this is the
+    # 养号 case where product_id isn't populated in Feishu.
+    flag = f"fl_attachment:{video_id}" if video_id else "fl_attachment"
+    return f"{match.group(1)}/{flag}/{match.group(2)}"
 
 
 def extract_text(field):
@@ -88,6 +93,32 @@ def extract_links(field):
     return links
 
 
+def fetch_nurturing_accounts():
+    """Fetch the account table and return the set of lowercased `post_account` values
+    whose 养号 field == "是". Nurturing accounts skip chrome product-add / music favoriting
+    and only run the original-audio upload skill.
+
+    On any failure (network, schema), return an empty set so the cycle falls back to
+    existing non-nurturing behavior rather than crashing."""
+    api_url = f"{CONFIG['feishu_info_url']}/bitable-r"
+    try:
+        req = urllib.request.Request(api_url)
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode())
+    except Exception as e:
+        print(f"  Warning: failed to fetch nurturing-account list ({e}); "
+              f"treating all accounts as non-nurturing.", file=sys.stderr)
+        return set()
+    nurturing = set()
+    for item in data.get("items", []):
+        fields = item.get("fields", {})
+        if (fields.get("养号") or "").strip() == "是":
+            account = (fields.get("post_account") or "").strip().lower()
+            if account:
+                nurturing.add(account)
+    return nurturing
+
+
 def fetch_pending_videos():
     api_url = f"{CONFIG['feishu_info_url']}/pending-upload"
     print(api_url)
@@ -96,28 +127,29 @@ def fetch_pending_videos():
         data = json.loads(resp.read().decode())
 
     results = []
-    for group in data.get("results", []):
-        for item in group.get("items", []):
-            record_id = item.get("record_id", "")
-            fields = item.get("fields", {})
-            video_id = extract_text(fields.get("product_id", []))
-            video_urls = extract_links(fields.get("ai_video_urls", []))
-            title = extract_text(fields.get("video_title", []))
-            upload_device = extract_text(fields.get("video_upload_device", []))
-            post_account = extract_text(fields.get("post_account", []))
-            music_url, music_name = extract_music_info(fields.get("music info", []))
-            for url in video_urls:
-                rewritten = rewrite_url(url, video_id)
-                results.append({
-                    "video_id": video_id,
-                    "url": rewritten,
-                    "title": title,
-                    "record_id": record_id,
-                    "upload_device": upload_device,
-                    "post_account": post_account,
-                    "music_url": music_url,
-                    "music_name": music_name,
-                })
+    for item in data.get("items", []):
+        record_id = item.get("record_id", "")
+        fields = item.get("fields", {})
+        video_id = extract_text(fields.get("video_id", []))
+        product_id = extract_text(fields.get("product_id", []))
+        video_urls = extract_links(fields.get("ai_video_urls", []))
+        title = extract_text(fields.get("video_title", []))
+        upload_device = extract_text(fields.get("video_upload_device", []))
+        post_account = extract_text(fields.get("post_account", []))
+        music_url, music_name = extract_music_info(fields.get("music info", []))
+        for url in video_urls:
+            rewritten = rewrite_url(url, video_id)
+            results.append({
+                "video_id": video_id,
+                "product_id": product_id,
+                "url": rewritten,
+                "title": title,
+                "record_id": record_id,
+                "upload_device": upload_device,
+                "post_account": post_account,
+                "music_url": music_url,
+                "music_name": music_name,
+            })
     return results
 
 
@@ -187,14 +219,17 @@ def ensure_device(upload_device: str):
 current_account = None
 
 
-def ensure_account(post_account: str):
+def ensure_account(post_account: str, force: bool = False):
     """Switch TikTok account if needed, using the switch-account skill.
 
     Skipped entirely when `config.switch_account` is `false` — useful when the
     iPhone is already set to the right account manually and you want to avoid
-    the extra LLM-driven verification (it's slow and occasionally flaky)."""
+    the extra LLM-driven verification (it's slow and occasionally flaky).
+
+    `force=True` overrides the config skip — used for 养号 accounts where we
+    cannot rely on the iPhone already being on the right account."""
     global current_account
-    if not CONFIG.get("switch_account", True):
+    if not force and not CONFIG.get("switch_account", True):
         print(f"  Skipping switch-account (config.switch_account=false); "
               f"assuming iPhone TikTok is on '{post_account}'.")
         return
@@ -338,9 +373,55 @@ def ensure_music_favorited(music_url: str):
         print(f"  Warning: favorite-music may have failed (exit {proc.returncode})", file=sys.stderr)
 
 
-URL_HIJACK_GUARD_MARKER = "URL_AUTOCOMPLETE_HIJACK_GUARD:"
 UPLOAD_POSTED_MARKER = "UPLOAD_VIDEO_POSTED:"
 UPLOAD_ABORTED_MARKER = "UPLOAD_VIDEO_ABORTED:"
+
+
+def _detect_caption_lang(title: str) -> str:
+    """Return 'Chinese' if the original caption contains more CJK ideographs than
+    Latin letters, else 'English'. Used to force the rewritten caption to stay in
+    the original language — relying on the model to auto-detect is unreliable
+    (it tends to translate English captions into Chinese for 'eye-catching' effect)."""
+    cjk = sum(1 for c in title if "一" <= c <= "鿿")
+    latin = sum(1 for c in title if c.isascii() and c.isalpha())
+    return "Chinese" if cjk > latin else "English"
+
+
+def optimize_title(title: str) -> str:
+    """For 养号 accounts: ask Claude to rewrite the original title into an
+    eye-catching TikTok caption (≤150-char body + 3 hashtags appended separately, same language as
+    the original). Falls back to the original on any failure so a bad/slow LLM
+    call never blocks the upload."""
+    if not title:
+        return title
+    lang = _detect_caption_lang(title)
+    prompt = (
+        "You are a TikTok viral-caption copywriter. Understand the meaning of the "
+        "original caption below, then rewrite it as an eye-catching TikTok caption.\n"
+        "Requirements:\n"
+        f"- OUTPUT LANGUAGE: {lang}. The body MUST be written in {lang}. "
+        f"Do NOT translate or switch to a different language under any circumstance.\n"
+        "- Body text must be 150 characters or fewer, NOT counting hashtags (count each Chinese / English char as 1)\n"
+        "- Append exactly 3 relevant English hashtags at the end (#xxx format, space-separated). Hashtags do NOT count toward the 150-char body limit.\n"
+        "- Tone: hook-y, conversational, curiosity-driven\n"
+        "- Output ONLY the final caption — no explanation, no prefix/suffix, no quotes\n\n"
+        f"Original caption: {title}"
+    )
+    try:
+        proc = subprocess.run(
+            ["claude", "-p", "--model", CLAUDE_MODEL],
+            input=prompt, capture_output=True, text=True, timeout=60,
+            cwd=SCRIPT_DIR,
+        )
+    except subprocess.TimeoutExpired:
+        print(f"  Warning: title optimization timed out; using original title.", file=sys.stderr)
+        return title
+    if proc.returncode != 0:
+        print(f"  Warning: title optimization exit {proc.returncode}; using original. "
+              f"stderr={proc.stderr[:200]}", file=sys.stderr)
+        return title
+    optimized = proc.stdout.strip().strip('"').strip("'")
+    return optimized or title
 
 
 def upload_video(video_url: str, title: str, skill_path: str = UPLOAD_SKILL_PATH) -> str:
@@ -349,8 +430,8 @@ def upload_video(video_url: str, title: str, skill_path: str = UPLOAD_SKILL_PATH
     fallback path used when product addition failed.
 
     Returns an EMPTY string on confirmed success (skill emitted `UPLOAD_VIDEO_POSTED:`).
-    Returns a NON-EMPTY failure note when the skill aborted (`UPLOAD_VIDEO_ABORTED:` marker),
-    hit the URL-hijack guard, or exited cleanly without confirming a post (silent abort).
+    Returns a NON-EMPTY failure note when the skill aborted (`UPLOAD_VIDEO_ABORTED:` marker)
+    or exited cleanly without confirming a post (silent abort).
     The caller uses an empty return to mark Feishu as posted; non-empty to write the note
     into the 备注 column with `post_time=N/A`."""
     with open(skill_path, "r") as f:
@@ -382,10 +463,9 @@ def upload_video(video_url: str, title: str, skill_path: str = UPLOAD_SKILL_PATH
 
     posted_seen = False
     abort_reason = ""
-    hijack_detected = False
 
     def _scan(text: str) -> None:
-        nonlocal posted_seen, abort_reason, hijack_detected
+        nonlocal posted_seen, abort_reason
         if UPLOAD_POSTED_MARKER in text:
             posted_seen = True
         if UPLOAD_ABORTED_MARKER in text and not abort_reason:
@@ -393,8 +473,6 @@ def upload_video(video_url: str, title: str, skill_path: str = UPLOAD_SKILL_PATH
             idx = text.find(UPLOAD_ABORTED_MARKER) + len(UPLOAD_ABORTED_MARKER)
             tail = text[idx:].splitlines()[0].strip() if text[idx:].strip() else ""
             abort_reason = tail or "(no reason given)"
-        if URL_HIJACK_GUARD_MARKER in text:
-            hijack_detected = True
 
     for line in proc.stdout:
         line = line.strip()
@@ -419,11 +497,19 @@ def upload_video(video_url: str, title: str, skill_path: str = UPLOAD_SKILL_PATH
         elif etype == "tool_result":
             content = event.get("content", "")
             if isinstance(content, list):
-                for c in content:
-                    if c.get("type") == "text":
-                        text = c.get("text", "")
-                        print(f"     = {text[:200]}", flush=True)
-                        _scan(text)
+                has_text = any(c.get("type") == "text" and c.get("text", "").strip()
+                              for c in content)
+                if has_text:
+                    for c in content:
+                        if c.get("type") == "text":
+                            text = c.get("text", "")
+                            print(f"     = {text[:200]}", flush=True)
+                            _scan(text)
+                else:
+                    # Image-only result — print a minimal marker to keep output compact
+                    print(f"     .", flush=True)
+            elif content and str(content).strip():
+                print(f"     = {str(content)[:200]}", flush=True)
         elif etype == "result":
             result = event.get("result", "")
             text = str(result)
@@ -432,12 +518,9 @@ def upload_video(video_url: str, title: str, skill_path: str = UPLOAD_SKILL_PATH
 
     proc.wait()
 
-    # Priority: explicit ABORTED > URL hijack > posted > silent abort
+    # Priority: explicit ABORTED > posted > silent abort
     if abort_reason:
         return f"上传未完成：{abort_reason}"
-    if hijack_detected:
-        return ("上传未完成：iOS Chrome omnibox autocomplete 抢回车（大小写错乱），"
-                "需清掉相关 Chrome 浏览历史后重试")
     if posted_seen:
         # Sub-process may exit 0 anyway, but we trust the marker as the source of truth.
         return ""
@@ -455,8 +538,24 @@ def main():
     if not videos:
         return
 
+    nurturing_accounts = fetch_nurturing_accounts()
+    if nurturing_accounts:
+        print(f"Nurturing (养号) accounts: {sorted(nurturing_accounts)}\n")
+
     for i, video in enumerate(videos, 1):
-        print(f"[{i}/{len(videos)}] {video['video_id']}: {video['title'][:50]} (device: {video['upload_device']}, account: {video['post_account']}, music: {video['music_name']})")
+        in_nurturing_table = (video["post_account"] or "").strip().lower() in nurturing_accounts
+        has_profile = has_chrome_profile_for_account(video["post_account"])
+        # Treat as 养号 (原音上传, no product / no chrome action) if the bitable-r table
+        # marks the account as 养号, OR if there is no matching system Chrome profile
+        # to add a product link from (without the profile the full path can't add a
+        # product anyway, so it would either crash or silently degrade to original audio).
+        is_nurturing = in_nurturing_table or not has_profile
+        if is_nurturing:
+            reason = "养号表" if in_nurturing_table else "无 chrome profile"
+            tag = f" [养号:{reason}]"
+        else:
+            tag = ""
+        print(f"[{i}/{len(videos)}]{tag} {video['video_id']}: {video['title'][:50]} (device: {video['upload_device']}, account: {video['post_account']}, music: {video['music_name']})")
         if not ensure_mirroring():
             print(f"  iPhone Mirroring failed to launch; skipping video.", file=sys.stderr)
             try:
@@ -465,8 +564,32 @@ def main():
                 print(f"  Feishu update failed: {e}\n", file=sys.stderr)
             continue
         ensure_device(video["upload_device"])
+        if is_nurturing:
+            # 养号 path: force switch-account (config.switch_account=false must not skip it),
+            # rewrite the caption via Claude to an eye-catching variant with hashtags,
+            # then go straight to the original-audio upload skill. No chrome product-add,
+            # no music favoriting.
+            ensure_account(video["post_account"], force=True)
+            optimized_title = optimize_title(video["title"])
+            if optimized_title != video["title"]:
+                print(f"  原标题: {video['title']}")
+                print(f"  优化后: {optimized_title}")
+            upload_note = upload_video(video["url"], optimized_title,
+                                       skill_path=UPLOAD_ORIGINAL_AUDIO_SKILL_PATH)
+            try:
+                if not upload_note:
+                    update_feishu_record(video["record_id"], note="养号-原音上传")
+                    print(f"  养号 upload done. Feishu record updated.\n")
+                else:
+                    update_feishu_record(video["record_id"], post_time="N/A",
+                                         note=f"养号-原音上传失败：{upload_note}")
+                    print(f"  养号 upload not confirmed; Feishu marked N/A. 备注={upload_note}\n",
+                          file=sys.stderr)
+            except Exception as e:
+                print(f"  Feishu update failed: {e}\n", file=sys.stderr)
+            continue
         ensure_account(video["post_account"])
-        chrome_note = ensure_chrome_action(video["post_account"], video["video_id"])
+        chrome_note = ensure_chrome_action(video["post_account"], video["product_id"])
         if chrome_note == NOT_LOGGED_IN_NOTE:
             # Login state for this account is dead — fallback upload would post under the
             # wrong account context; better to skip and let the user re-login + retry.

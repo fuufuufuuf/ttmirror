@@ -43,13 +43,33 @@ Add a product (by `PRODUCT_ID`) to the showcase of `${POST_ACCOUNT}`'s TikTok Sh
 7. `fill T` with `https://shop.tiktok.com/view/product/${PRODUCT_ID}?region=US`.
 8. `click L`.
 9. `Bash sleep 5`.
-10. `take_snapshot`. Find the dialog's submit `button "添加商品"` (alongside `C`, NOT the page-level button). Its `disabled` state IS the affiliate-eligibility signal:
-    - **Still `disableable disabled`** → product is NOT in the affiliate program. `click C` to close the dialog, then **stop the entire skill** and emit this exact final line:
+10. `take_snapshot` to find the dialog's submit `button "添加商品"` (alongside `C`, NOT the page-level button). Capture its uid as **`S`**. Then use `evaluate_script` to check the button's real DOM `disabled` property directly — this avoids a11y tree ambiguity around the `disabled` attribute:
+
+    ```js
+    () => {
+      // Find the submit "添加商品" button inside the dialog (not the page-level one).
+      // It is siblings with the "取消" button (C). Filter to visible buttons only.
+      const allButtons = [...document.querySelectorAll('button')];
+      const dialogButtons = allButtons.filter(b => {
+        const text = (b.textContent || '').trim();
+        return text.includes('添加商品') && b.offsetParent !== null && b.getAttribute('aria-disabled') !== 'true';
+      });
+      // The dialog submit is the one with '添加商品' text that is NOT the page-level toolbar button.
+      // Prefer buttons whose ancestor includes a dialog/tabpanel role.
+      const submitBtn = dialogButtons.find(b => {
+        const rect = b.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      }) || dialogButtons[0];
+      if (!submitBtn) return { found: false };
+      return { found: true, disabled: submitBtn.disabled, text: submitBtn.textContent.trim() };
+    }
+    ```
+
+    - **`disabled: true`** → product is NOT in the affiliate program. `click C` to close the dialog, then **stop the entire skill** and emit this exact final line:
 
       `NON_AFFILIATE_PRODUCT: 此商品不是联盟营销商品。请联系卖家，以将其注册到联盟计划中`
 
-      Do NOT text-match the Chinese error in the snapshot — the toast may not render in the a11y tree, and quoting the string in your own narrative would false-trigger the caller's regex.
-    - **Enabled (no `disabled`)** → continue. Capture this submit button's uid as **`S`**.
+    - **`disabled: false`** or `found: false`** → continue. Proceed to Step 11.
 
 ### Part 4: Submit, close, and verify by PRODUCT_ID
 

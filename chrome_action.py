@@ -186,6 +186,16 @@ def ensure_debug_chrome(account: str, user_data_dir: str):
     raise RuntimeError(f"Debug Chrome for '{account}' did not become reachable on port {CHROME_DEBUG_PORT} (see {log_path})")
 
 
+def has_chrome_profile_for_account(account: str) -> bool:
+    """Cheap predicate: does the system Chrome's Local State contain a profile whose
+    display name matches `account`? No copy / no side effects. Used by callers (e.g.
+    auto_upload.py) to decide whether to route a video through the full upload path
+    (needs a TikTok-Shop-logged-in profile) or the 养号 / original-audio fallback."""
+    if not account or not account.strip():
+        return False
+    return bool(_find_system_chrome_profile_subdir(account))
+
+
 NON_AFFILIATE_NOTE = "此商品不是联盟营销商品。请联系卖家，以将其注册到联盟计划中"
 VERIFY_FAILED_PREFIX = "VERIFY_FAILED_PRODUCT_NOT_IN_SHOWCASE:"
 # Sentinel value — caller compares chrome_note against this constant to decide whether
